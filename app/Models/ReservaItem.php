@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ReservaItem extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'reserva_id',
         'equipo_id',

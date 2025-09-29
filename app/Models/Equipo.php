@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Equipo extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'nombre',
         'descripcion',
         'cantidad',
-        'disponible',
         'tipo_equipo_id',
     ];
 
@@ -31,21 +32,21 @@ class Equipo extends Model
 
     public function disponibleEnRango($inicio, $fin): int
     {
-        // Cantidad total del equipo
         $total = $this->cantidad;
 
-        // Reservas que se solapan en el rango
         $reservado = $this->reservaItems()
             ->whereHas('reserva', function ($q) use ($inicio, $fin) {
                 $q->whereIn('estado', ['pendiente', 'en_curso'])
                     ->where(function ($query) use ($inicio, $fin) {
-                        $query->where('inicio', '<', $fin)   // la reserva empieza antes que termine el rango
-                            ->where('fin', '>', $inicio); // y termina después que empieza el rango
+                        $query->where('inicio', '<', $fin)   // empieza antes de que termine mi rango
+                            ->where('fin', '>', $inicio); // termina después de que empiece mi rango
                     });
             })
             ->sum('cantidad');
 
         return max(0, $total - $reservado);
     }
+
+
 
 }

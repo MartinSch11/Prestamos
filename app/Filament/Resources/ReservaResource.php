@@ -4,7 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReservaResource\Pages;
 use App\Models\Reserva;
-use App\Models\Equipo;
+use Filament\Actions\DeleteAction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -33,31 +33,69 @@ class ReservaResource extends Resource
 
                 Forms\Components\DateTimePicker::make('fin')
                     ->label('Fecha fin')
-                    ->required(),
+                    ->required()
+                    ->rules([
+                        function (\Filament\Forms\Get $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $inicio = $get('inicio');
+                                if ($inicio && $value && $value < $inicio) {
+                                    $fail('La fecha de fin no puede ser anterior a la fecha de inicio.');
+                                }
+                            };
+                        },
+                    ]),
 
-                // 🔹 Equipos como detalles de la reserva
                 Forms\Components\Repeater::make('items')
                     ->label('Equipos reservados')
-                    ->relationship() // usa la relación hasMany Reserva->items
+                    ->relationship()
                     ->schema([
                         Forms\Components\Select::make('equipo_id')
                             ->label('Equipo')
                             ->relationship('equipo', 'nombre')
                             ->required()
                             ->preload()
-                            ->searchable(),
+                            ->searchable()
+                            ->reactive()
+                            ->getOptionLabelFromRecordUsing(function ($record, \Filament\Forms\Get $get) {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+
+                                if ($inicio && $fin) {
+                                    $disponibles = $record->disponibleEnRango($inicio, $fin);
+                                    return "{$record->nombre} (Disponibles: {$disponibles})";
+                                }
+
+                                return $record->nombre;
+                            }),
 
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->numeric()
                             ->minValue(1)
-                            ->required(),
+                            ->required()
+                            ->rules([
+                                function (\Filament\Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $equipoId = $get('equipo_id');
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+
+                                        if ($equipoId && $inicio && $fin) {
+                                            $equipo = \App\Models\Equipo::find($equipoId);
+                                            if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin)) {
+                                                $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                            }
+                                        }
+                                    };
+                                },
+                            ]),
                     ])
                     ->minItems(1)
                     ->columns(2)
                     ->createItemButtonLabel('Agregar equipo'),
             ]);
     }
+
 
     public static function table(Table $table): Table
     {
@@ -83,8 +121,15 @@ class ReservaResource extends Resource
                     ->badge()
                     ->colors([
                         'warning' => 'pendiente',
+                        'info' => 'en_curso',
                         'success' => 'devuelto',
-                    ]),
+                    ])
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'pendiente' => 'Pendiente',
+                        'en_curso' => 'En curso',
+                        'devuelto' => 'Devuelto',
+                        default => ucfirst($state),
+                    }),
 
                 Tables\Columns\TextColumn::make('items_count')
                     ->label('Equipos')
@@ -95,23 +140,34 @@ class ReservaResource extends Resource
                     ->label('Estado')
                     ->options([
                         'pendiente' => 'Pendiente',
+                        'en_curso' => 'En curso',
                         'devuelto' => 'Devuelto',
                     ]),
             ])
-            // 👇 Esto evita que redireccione a Edit
             ->recordUrl(null)
-            // 👇 Esto hace que el click en la fila abra el modal de "Ver"
             ->recordAction('view')
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
+
+                    // 👉 Botón "Marcar en curso"
+                    Tables\Actions\Action::make('en_curso')
+                        ->label('Marcar en curso')
+                        ->icon('heroicon-o-play')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->visible(fn(Reserva $record) => $record->estado === 'pendiente')
+                        ->action(fn(Reserva $record) => $record->update(['estado' => 'en_curso'])),
+
+                    // 👉 Botón "Marcar como devuelto"
                     Tables\Actions\Action::make('devolver')
                         ->label('Marcar como devuelto')
                         ->icon('heroicon-o-check')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->visible(fn(Reserva $record) => $record->estado !== 'devuelto')
+                        ->visible(fn(Reserva $record) => $record->estado === 'en_curso')
                         ->action(fn(Reserva $record) => $record->update(['estado' => 'devuelto'])),
                 ])
                     ->label('Acciones')

@@ -87,7 +87,7 @@ class EquipoResource extends Resource
 
                 Tables\Columns\TextColumn::make('disponibles')
                     ->label('Disponibles ahora')
-                    ->getStateUsing(fn($record) => $record->disponibleEnRango(now(), now()->addDays(30))),
+                    ->getStateUsing(fn($record) => $record->disponibleEnRango(now(), now())),
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('disponible')
