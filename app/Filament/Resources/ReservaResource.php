@@ -152,7 +152,6 @@ class ReservaResource extends Resource
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
 
-                    // 👉 Botón "Marcar en curso"
                     Tables\Actions\Action::make('en_curso')
                         ->label('Marcar en curso')
                         ->icon('heroicon-o-play')
@@ -161,7 +160,6 @@ class ReservaResource extends Resource
                         ->visible(fn(Reserva $record) => $record->estado === 'pendiente')
                         ->action(fn(Reserva $record) => $record->update(['estado' => 'en_curso'])),
 
-                    // 👉 Botón "Marcar como devuelto"
                     Tables\Actions\Action::make('devolver')
                         ->label('Marcar como devuelto')
                         ->icon('heroicon-o-check')
@@ -172,7 +170,8 @@ class ReservaResource extends Resource
                 ])
                     ->label('Acciones')
                     ->icon('heroicon-m-ellipsis-vertical'),
-            ]);
+            ])
+            ->defaultSort('inicio', 'desc'); // 👉 Orden por defecto descendente
     }
 
     public static function getRelations(): array

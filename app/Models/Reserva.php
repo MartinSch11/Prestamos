@@ -15,6 +15,11 @@ class Reserva extends Model
         'estado',
     ];
 
+    protected $casts = [
+        'inicio' => 'datetime',
+        'fin' => 'datetime',
+    ];
+
     public function items()
     {
         return $this->hasMany(ReservaItem::class);
