@@ -12,14 +12,13 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Forms;
 use Filament\Forms\Get;
 
-class ReservasCalendarAsana extends Page implements HasActions
+class ReservasCalendar extends Page implements HasActions
 {
     use InteractsWithActions;
-    
     protected static ?string $navigationIcon = 'heroicon-o-calendar';
     protected static ?string $navigationLabel = 'Calendario';
-    protected static string $view = 'filament.pages.reservas-calendar-asana';
-    protected static ?string $title = 'Calendario';
+    protected static string $view = 'filament.pages.reservas-calendar';
+    protected static ?string $title = '';
 
     public $weekOffset = 0;
     public ?Reserva $record = null;
@@ -90,36 +89,6 @@ class ReservasCalendarAsana extends Page implements HasActions
         $this->dispatch('close-modal', id: 'reserva-modal');
     }
 
-    public function eliminarReserva()
-    {
-        if (!$this->record) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error: No se encontró la reserva')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        try {
-            $this->record->delete();
-
-            \Filament\Notifications\Notification::make()
-                ->title('Reserva eliminada exitosamente')
-                ->success()
-                ->send();
-
-            $this->closeReservaModal();
-            $this->dispatch('$refresh');
-            
-        } catch (\Exception $e) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error al eliminar la reserva')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
-        }
-    }
-
     public function marcarEnCurso()
     {
         if (!$this->record) {
@@ -140,7 +109,7 @@ class ReservasCalendarAsana extends Page implements HasActions
 
             $this->closeReservaModal();
             $this->dispatch('$refresh');
-            
+
         } catch (\Exception $e) {
             \Filament\Notifications\Notification::make()
                 ->title('Error al actualizar la reserva')
@@ -170,7 +139,7 @@ class ReservasCalendarAsana extends Page implements HasActions
 
             $this->closeReservaModal();
             $this->dispatch('$refresh');
-            
+
         } catch (\Exception $e) {
             \Filament\Notifications\Notification::make()
                 ->title('Error al actualizar la reserva')
@@ -197,7 +166,52 @@ class ReservasCalendarAsana extends Page implements HasActions
     {
         return [
             $this->editAction()->visible(false),
+            $this->eliminarReservaAction()->visible(false),
         ];
+    }
+
+    protected function eliminarReservaAction(): Action
+    {
+        return Action::make('eliminarReserva')
+            ->label('Eliminar')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->outlined()
+            ->size('sm')
+            ->disabled(fn() => $this->record && in_array($this->record->estado, ['devuelto', 'completado']))
+            ->requiresConfirmation()
+            ->modalHeading('Eliminar reserva')
+            ->modalDescription('¿Estás seguro de que deseas eliminar esta reserva? Esta acción no se puede deshacer.')
+            ->modalSubmitActionLabel('Sí, eliminar')
+            ->modalCancelActionLabel('Cancelar')
+            ->action(function () {
+                if (!$this->record) {
+                    \Filament\Notifications\Notification::make()
+                        ->title('Error: No se encontró la reserva')
+                        ->danger()
+                        ->send();
+                    return;
+                }
+
+                try {
+                    $this->record->delete();
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Reserva eliminada exitosamente')
+                        ->success()
+                        ->send();
+
+                    $this->closeReservaModal();
+                    $this->dispatch('$refresh');
+
+                } catch (\Exception $e) {
+                    \Filament\Notifications\Notification::make()
+                        ->title('Error al eliminar la reserva')
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->send();
+                }
+            });
     }
 
     protected function editAction(): Action
@@ -230,11 +244,13 @@ class ReservasCalendarAsana extends Page implements HasActions
                     ->schema([
                         Forms\Components\DateTimePicker::make('inicio')
                             ->required()
-                            ->label('Fecha inicio'),
+                            ->label('Fecha inicio')
+                            ->reactive(),
 
                         Forms\Components\DateTimePicker::make('fin')
                             ->required()
                             ->label('Fecha fin')
+                            ->reactive()
                             ->rules([
                                 function (Forms\Get $get) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -274,7 +290,23 @@ class ReservasCalendarAsana extends Page implements HasActions
                             ->label('Cantidad')
                             ->numeric()
                             ->minValue(1)
-                            ->required(),
+                            ->required()
+                            ->rules([
+                                function (Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $equipoId = $get('equipo_id');
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+
+                                        if ($equipoId && $inicio && $fin) {
+                                            $equipo = Equipo::find($equipoId);
+                                            if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin)) {
+                                                $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                            }
+                                        }
+                                    };
+                                },
+                            ]),
                     ])
                     ->minItems(1)
                     ->columns(2)
@@ -355,12 +387,24 @@ class ReservasCalendarAsana extends Page implements HasActions
                         Forms\Components\DateTimePicker::make('inicio')
                             ->required()
                             ->label('Fecha inicio')
-                            ->default(now()),
+                            ->default(now())
+                            ->reactive(),
 
                         Forms\Components\DateTimePicker::make('fin')
                             ->required()
                             ->label('Fecha fin')
-                            ->default(now()->addDay()),
+                            ->default(now()->addDay())
+                            ->reactive()
+                            ->rules([
+                                function (Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $inicio = $get('inicio');
+                                        if ($inicio && $value && $value < $inicio) {
+                                            $fail('La fecha de fin no puede ser anterior a la fecha de inicio.');
+                                        }
+                                    };
+                                },
+                            ]),
                     ]),
 
                 Forms\Components\Repeater::make('items')
@@ -368,16 +412,45 @@ class ReservasCalendarAsana extends Page implements HasActions
                     ->schema([
                         Forms\Components\Select::make('equipo_id')
                             ->label('Equipo')
-                            ->options(Equipo::all()->pluck('nombre', 'id'))
+                            ->options(function (Forms\Get $get) {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+
+                                return Equipo::all()->mapWithKeys(function ($equipo) use ($inicio, $fin) {
+                                    $label = $equipo->nombre;
+                                    if ($inicio && $fin) {
+                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin);
+                                        $label .= " (Disponibles: {$disponibles})";
+                                    }
+                                    return [$equipo->id => $label];
+                                });
+                            })
                             ->required()
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->reactive(),
 
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->numeric()
                             ->minValue(1)
-                            ->required(),
+                            ->required()
+                            ->rules([
+                                function (Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $equipoId = $get('equipo_id');
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+
+                                        if ($equipoId && $inicio && $fin) {
+                                            $equipo = Equipo::find($equipoId);
+                                            if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin)) {
+                                                $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                            }
+                                        }
+                                    };
+                                },
+                            ]),
                     ])
                     ->minItems(1)
                     ->columns(2)
@@ -406,9 +479,9 @@ class ReservasCalendarAsana extends Page implements HasActions
                         ->title('Reserva creada exitosamente')
                         ->success()
                         ->send();
-                    
+
                     $this->dispatch('$refresh');
-                    
+
                 } catch (\Exception $e) {
                     \Filament\Notifications\Notification::make()
                         ->title('Error al crear la reserva')

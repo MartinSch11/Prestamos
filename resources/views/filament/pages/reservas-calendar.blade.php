@@ -51,22 +51,22 @@
                         $isToday = $day->isToday();
                     @endphp
 
-                    {{-- <CHANGE> Remover border-right de las celdas --}}
-                        <div class="p-3 bg-gray-50 dark:bg-gray-900">
-                            <div class="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide">
-                                {{ mb_strtoupper($day->locale('es')->isoFormat('ddd')) }}
-                            </div>
-                            <div class="mt-1.5">
-                                <span
-                                    class="inline-flex items-center justify-center w-8 h-8 text-sm font-semibold rounded-full {{ $isToday ? 'today-badge' : 'text-gray-700 dark:text-gray-300' }}">
-                                    {{ $day->isoFormat('D') }}
-                                </span>
-                            </div>
+                    {{-- Ajustado el color de fondo de la cabecera para mejor transición --}}
+                    <div class="p-3 bg-gray-50 dark:bg-gray-800">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide">
+                            {{ mb_strtoupper($day->locale('es')->isoFormat('ddd')) }}
                         </div>
+                        <div class="mt-1.5">
+                            <span
+                                class="inline-flex items-center justify-center w-8 h-8 text-sm font-semibold rounded-full {{ $isToday ? 'today-badge' : 'text-gray-700 dark:text-gray-400' }}">
+                                {{ $day->isoFormat('D') }}
+                            </span>
+                        </div>
+                    </div>
                 @endfor
             </div>
             {{-- Grid de eventos --}}
-            <div class="grid grid-cols-7 relative calendar-grid" style="min-height: 400px;">
+            <div class="grid grid-cols-7 relative calendar-grid bg-gray-50 dark:bg-gray-800" style="min-height: 400px;">
                 {{-- Líneas divisorias verticales --}}
                 @for ($i = 1; $i < 7; $i++)
                     <div class="calendar-day-divider" style="left: calc({{ $i }} * (100% / 7));">
@@ -126,12 +126,12 @@
                             ($continuaAntes ? 'clip-left' :
                                 ($continuaDespues ? 'clip-right' : 'clip-'));
 
-                        // Paleta clara (sin “desaparecer” en light/dark)
-                        $bgColor = match ($evento['estado']) { 'pendiente' => '#DBEAFE', // azul muy claro
-                            'en_curso' => '#FEF3C7', // ámbar claro
-                            'devuelto' => '#D1FAE5', // verde claro
-                            'bloqueado' => '#FEE2E2', // rojo claro
-                            default => '#F3F4F6', // gris claro
+                        // Paleta
+                        $bgColor = match ($evento['estado']) { 'pendiente' => '#93C5FD', // azul pastel oscuro (Tailwind blue-300)
+                            'en_curso' => '#FCD34D', // ámbar pastel oscuro (Tailwind amber-300)
+                            'devuelto' => '#86EFAC', // verde pastel oscuro (Tailwind green-300)
+                            'bloqueado' => '#FCA5A5', // rojo pastel oscuro (Tailwind red-300)
+                            default => '#D1D5DB', // gris pastel oscuro (Tailwind gray-300)
                         };
 
                         $estadoLabel = match ($evento['estado']) {
@@ -143,56 +143,67 @@
                         };
                     @endphp
 
-                    <div class="asana-event-wrapper"
-                        style="grid-column: {{ $startDay + 1 }} / span {{ $span }}; grid-row: {{ $row }}; padding: 6px 8px;">
+                    <div class="timeline-event-wrapper"
+                        style="grid-column: {{ $startDay + 1 }} / span {{ $span }}; grid-row: {{ $row }}; padding: 3px 6px;">
 
-                        {{-- Tooltip con posicionamiento mejorado --}}
                         <div x-data="{
-                            showTooltip: false,
-                            tooltipX: 0,
-                            tooltipY: 0,
-                            arrowX: 0,
-                            isBelow: false,
-                            positionTooltip() {
+                                showTooltip: false,
+                                tooltipX: 0,
+                                tooltipY: 0,
+                                arrowX: 0,
+                                isBelow: false,
+                                positionTooltip() {
+                                this.$nextTick(() => {
+                                this.$nextTick(() => {
                                 const ev = this.$refs.event.getBoundingClientRect();
                                 const tp = this.$refs.tooltip.getBoundingClientRect();
 
-                                // Calcular posición centrada horizontalmente
-                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
-                                let top = ev.top - tp.height - 12;
+                                                        if (tp.width === 0 || tp.height === 0) {
+                                                            requestAnimationFrame(() => {
+                                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
 
-                                // Verificar si hay espacio arriba
-                                if (top < 10) {
-                                    // No hay espacio arriba, colocar debajo
-                                    top = ev.bottom + 12;
-                                    this.isBelow = true;
-                                } else {
-                                    this.isBelow = false;
-                                }
+                                                                // Si aún no tiene dimensiones, usar altura estimada
+                                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
+                                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
 
-                                // Ajustar horizontalmente si se sale de la pantalla
-                                const originalLeft = left;
-                                if (left < 10) {
-                                    left = 10;
-                                }
-                                if (left + tp.width > window.innerWidth - 10) {
-                                    left = window.innerWidth - tp.width - 10;
-                                }
+                                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                            });
+                                                            return;
+                                                        }
 
-                                // Calcular posición de la flecha relativa al centro del evento
-                                const eventCenterX = ev.left + (ev.width / 2);
-                                this.arrowX = eventCenterX - left;
+                                                        this.calculatePosition(ev, tp);
+                                                    });
+                                                });
+                                            },
+                                            calculatePosition(ev, tp) {
+                                                let top = ev.top - tp.height - 12;
 
-                                this.tooltipX = left;
-                                this.tooltipY = top;
-                            }
-                        }" @mouseenter="showTooltip = true; $nextTick(() => positionTooltip())"
+                                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
+                                                const eventCenterX = ev.left + (ev.width / 2);
+
+                                                if (left < 10) {
+                                                    left = 10;
+                                                }
+                                                if (left + tp.width > window.innerWidth - 10) {
+                                                    left = window.innerWidth - tp.width - 10;
+                                                }
+
+                                                let arrowX = eventCenterX - left;
+                                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
+
+                                                this.isBelow = false;
+                                                this.arrowX = arrowX;
+                                                this.tooltipX = left;
+                                                this.tooltipY = top;
+
+                                            }
+                                        }" @mouseenter="showTooltip = true; positionTooltip()"
                             @mouseleave="showTooltip = false" class="relative w-full h-full">
 
                             <div x-ref="event" @click="$wire.openReservaModal({{ $evento['id'] }})"
-                                class="asana-event cursor-pointer {{ $clipClass }}"
+                                class="timeline-event cursor-pointer {{ $clipClass }} {{ $evento['estado'] === 'devuelto' ? 'event-devuelto' : '' }}"
                                 style="background-color: {{ $bgColor }};">
-                                <div class="asana-event-content">
+                                <div class="timeline-event-content">
                                     <span class="event-title">{{ $evento['title'] }}</span>
                                 </div>
                             </div>
@@ -202,33 +213,34 @@
                                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                                 x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
                                 x-transition:leave-end="opacity-0" :style="`left: ${tooltipX}px; top: ${tooltipY}px;`"
-                                class="asana-tooltip-alpine" style="display: none;">
+                                class="timeline-tooltip-alpine" style="display: none;">
 
                                 <div class="tooltip-content">
-                                    <div class="font-semibold text-sm">{{ $evento['title'] }}</div>
-                                    <div class="text-xs mt-1.5 text-gray-600 dark:text-gray-300">
+                                    <div class="font-semibold text-sm text-gray-900 dark:text-white">
+                                        {{ $evento['title'] }}
+                                    </div>
+
+                                    <div class="text-xs mt-1.5 text-gray-700 dark:text-gray-200">
                                         {{ \Carbon\Carbon::parse($evento['start'])->locale('es')->isoFormat('D MMM YYYY') }}
                                         – {{ \Carbon\Carbon::parse($evento['end'])->locale('es')->isoFormat('D MMM YYYY') }}
                                     </div>
-                                    <div class="text-xs mt-1 text-gray-600 dark:text-gray-300">
+
+                                    <div class="text-xs mt-1 text-gray-700 dark:text-gray-200">
                                         Estado: <span
                                             class="font-medium text-gray-900 dark:text-white">{{ $estadoLabel }}</span>
                                     </div>
 
                                     @if(isset($evento['items']) && count($evento['items']) > 0)
                                         <div class="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                                            <div class="text-xs font-semibold mb-1">Items:</div>
+                                            <div class="text-xs font-semibold mb-1 text-gray-900 dark:text-white">Items:</div>
                                             @foreach($evento['items'] as $item)
-                                                <div class="text-xs text-gray-600 dark:text-gray-300">{{ $item }}</div>
+                                                <div class="text-xs text-gray-700 dark:text-gray-200">{{ $item }}</div>
                                             @endforeach
                                         </div>
                                     @endif
                                 </div>
 
-                                {{-- Flecha dinámica que se ajusta según la posición --}}
-                                <div class="tooltip-arrow"
-                                    :class="{ 'tooltip-arrow-top': isBelow, 'tooltip-arrow-bottom': !isBelow }"
-                                    :style="`left: ${arrowX}px;`"></div>
+                                <div class="tooltip-arrow tooltip-arrow-bottom" :style="`left: ${arrowX}px;`"></div>
                             </div>
                         </div>
                     </div>
@@ -237,6 +249,7 @@
 
         </div>
     </div>
+
     <x-filament::modal id="reserva-modal" width="2xl">
         @if($record)
             <div class="space-y-4 p-2">
@@ -311,7 +324,7 @@
                             <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                    d="M20 7l-8-4-8 4m16 0l-8 4m-8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
                             Equipos reservados
                         </h3>
@@ -346,11 +359,8 @@
                 {{-- Botones de acción --}}
                 <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div class="flex items-center justify-end gap-3">
-                        <x-filament::button wire:click="eliminarReserva"
-                            wire:confirm="¿Estás seguro de que deseas eliminar esta reserva?" color="danger" outlined
-                            icon="heroicon-o-trash" size="sm" :disabled="in_array($record->estado, ['devuelto', 'completado'])">
-                            Eliminar
-                        </x-filament::button>
+
+                        {{ ($this->eliminarReservaAction) }}
 
                         @if($record->estado === 'pendiente')
                             <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt"
@@ -383,21 +393,13 @@
     <style>
         .calendar-grid {
             position: relative;
-            /* necesario para los divisores absolutos */
-            background-color: #ffffff;
             overflow: visible !important;
         }
 
-        .dark .calendar-grid {
-            background-color: rgb(31, 41, 55);
-        }
-
-        /* líneas verticales absolutas */
         .calendar-day-divider {
             position: absolute;
             top: 0;
             bottom: 0;
-            /* <- asegura que llegue al final */
             width: 1px;
             background-color: #e5e7eb;
             pointer-events: none;
@@ -405,14 +407,13 @@
         }
 
         .dark .calendar-day-divider {
-            background-color: #4b5563;
+            background-color: #374151;
         }
 
         .calendar-header {
             position: relative;
         }
 
-        /* <CHANGE> Líneas divisorias absolutas en el header para alinear con el grid */
         .calendar-header-divider {
             position: absolute;
             top: 0;
@@ -424,30 +425,17 @@
         }
 
         .dark .calendar-header-divider {
-            background-color: #4b5563;
+            background-color: #374151;
         }
 
-        .calendar-header-day {
-            position: relative;
-            border-right: 1px solid #e5e7eb;
-        }
-
-        .calendar-header-day:last-child {
-            border-right: none;
-        }
-
-        .dark .calendar-header-day {
-            border-right-color: #4b5563;
-        }
-
-        .asana-event-wrapper {
+        .timeline-event-wrapper {
             position: relative;
             height: 44px;
             overflow: visible !important;
             z-index: 1;
         }
 
-        .asana-event {
+        .timeline-event {
             position: relative;
             height: 100%;
             width: 100%;
@@ -462,13 +450,13 @@
             transition: all 0.15s ease;
         }
 
-        .asana-event:hover {
+        .timeline-event:hover {
             box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
             transform: translateY(-1px);
             z-index: 100;
         }
 
-        .asana-event-content {
+        .timeline-event-content {
             flex: 1;
             white-space: nowrap;
             overflow: hidden;
@@ -484,15 +472,15 @@
             line-height: 1.3;
         }
 
-        .asana-tooltip-alpine {
+        .timeline-tooltip-alpine {
             position: fixed;
             z-index: 99999;
             pointer-events: none;
         }
 
+        /* Tooltip content con soporte para modo claro y oscuro */
         .tooltip-content {
             background-color: #ffffff;
-            color: #1f2937;
             padding: 10px 14px;
             border-radius: 6px;
             font-size: 0.75rem;
@@ -504,28 +492,42 @@
         }
 
         .dark .tooltip-content {
-            background-color: #1f2937;
-            color: white;
+            background-color: #2a2d34;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             border-color: #374151;
         }
 
+        /* Estilos base para la flecha del tooltip */
         .tooltip-arrow {
             position: absolute;
-            top: 100%;
-            left: 50%;
             transform: translateX(-50%);
             width: 0;
             height: 0;
             border-left: 6px solid transparent;
             border-right: 6px solid transparent;
+        }
+
+        /* Flecha apuntando hacia arriba (tooltip está debajo del evento) */
+        .tooltip-arrow-top {
+            top: -6px;
+            border-bottom: 6px solid #ffffff;
+        }
+
+        .dark .tooltip-arrow-top {
+            border-bottom-color: #2a2d34;
+        }
+
+        /* Flecha apuntando hacia abajo (tooltip está arriba del evento) */
+        .tooltip-arrow-bottom {
+            bottom: -6px;
             border-top: 6px solid #ffffff;
         }
 
-        .dark .tooltip-arrow {
-            border-top-color: #1f2937;
+        .dark .tooltip-arrow-bottom {
+            border-top-color: #2a2d34;
         }
 
+        /* Clips para los eventos que continúan */
         .clip- {
             clip-path: inset(0 round 6px);
         }
@@ -560,6 +562,30 @@
 
         .today-badge:hover {
             background-color: #1d4ed8 !important;
+        }
+
+        /* Efecto gris para reservas devueltas */
+        .timeline-event.event-devuelto::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(156, 163, 175, 0.6);
+            /* gray-400 con 60% opacidad */
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .dark .timeline-event.event-devuelto::before {
+            background-color: rgba(75, 85, 99, 0.7);
+            /* gray-600 con 70% opacidad en modo oscuro */
+        }
+
+        .timeline-event.event-devuelto .timeline-event-content {
+            opacity: 0.85;
         }
 
         @media (max-width: 768px) {

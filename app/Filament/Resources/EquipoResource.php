@@ -52,10 +52,6 @@ class EquipoResource extends Resource
                     ->minValue(1)
                     ->default(1)
                     ->required(),
-
-                Forms\Components\Toggle::make('disponible')
-                    ->label('Disponible')
-                    ->default(true),
             ]);
     }
 
@@ -87,19 +83,15 @@ class EquipoResource extends Resource
 
                 Tables\Columns\TextColumn::make('disponibles')
                     ->label('Disponibles ahora')
-                    ->getStateUsing(fn($record) => $record->disponibleEnRango(now(), now())),
+                    ->getStateUsing(fn($record) => $record->disponibleAhora()),
+
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('disponible')
-                    ->label('Disponibilidad')
-                    ->boolean()
-                    ->trueLabel('Solo disponibles')
-                    ->falseLabel('Solo no disponibles'),
-
                 Tables\Filters\SelectFilter::make('tipo_equipo_id')
                     ->label('Tipo de equipo')
                     ->relationship('tipo', 'nombre'),
             ])
+
             ->recordUrl(null)
             ->recordAction('view')
             ->actions([
