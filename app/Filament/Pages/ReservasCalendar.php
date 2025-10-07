@@ -178,7 +178,7 @@ class ReservasCalendar extends Page implements HasActions
             ->color('danger')
             ->outlined()
             ->size('sm')
-            ->disabled(fn() => $this->record && in_array($this->record->estado, ['devuelto', 'completado']))
+            ->disabled(fn() => $this->record && in_array($this->record->estado, ['en_curso','devuelto', 'completado']))
             ->requiresConfirmation()
             ->modalHeading('Eliminar reserva')
             ->modalDescription('¿Estás seguro de que deseas eliminar esta reserva? Esta acción no se puede deshacer.')

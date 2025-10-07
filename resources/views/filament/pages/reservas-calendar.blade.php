@@ -28,7 +28,7 @@
                 </div>
 
                 <div class="flex items-center">
-                    <span class="px-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    <span class="px-3 text-sm font-semibold text-gray-700 dark:text-white">
                         {{ ucfirst($this->getWeekStart()->locale('es')->isoFormat('MMMM YYYY')) }}
                     </span>
                 </div>
@@ -127,10 +127,10 @@
                                 ($continuaDespues ? 'clip-right' : 'clip-'));
 
                         // Paleta
-                        $bgColor = match ($evento['estado']) { 'pendiente' => '#93C5FD', // azul pastel oscuro (Tailwind blue-300)
-                            'en_curso' => '#FCD34D', // ámbar pastel oscuro (Tailwind amber-300)
-                            'devuelto' => '#86EFAC', // verde pastel oscuro (Tailwind green-300)
-                            'bloqueado' => '#FCA5A5', // rojo pastel oscuro (Tailwind red-300)
+                        $bgColor = match ($evento['estado']) { 'pendiente' => '#FEDBB2', // azul pastel oscuro (Tailwind blue-300)
+                            'en_curso' => '#A3D6F0', // ámbar pastel oscuro (Tailwind amber-300)
+                            'devuelto' => '#93CFA4', // verde pastel oscuro (Tailwind green-300)
+                            'bloqueado' => '#FFCFCF', // rojo pastel oscuro (Tailwind red-300)
                             default => '#D1D5DB', // gris pastel oscuro (Tailwind gray-300)
                         };
 
@@ -147,58 +147,59 @@
                         style="grid-column: {{ $startDay + 1 }} / span {{ $span }}; grid-row: {{ $row }}; padding: 3px 6px;">
 
                         <div x-data="{
-                                showTooltip: false,
-                                tooltipX: 0,
-                                tooltipY: 0,
-                                arrowX: 0,
-                                isBelow: false,
-                                positionTooltip() {
-                                this.$nextTick(() => {
-                                this.$nextTick(() => {
-                                const ev = this.$refs.event.getBoundingClientRect();
-                                const tp = this.$refs.tooltip.getBoundingClientRect();
+                                                                showTooltip: false,
+                                                                tooltipX: 0,
+                                                                tooltipY: 0,
+                                                                arrowX: 0,
+                                                                isBelow: false,
+                                                                positionTooltip() {
+                                                                this.$nextTick(() => {
+                                                                this.$nextTick(() => {
+                                                                const ev = this.$refs.event.getBoundingClientRect();
+                                                                const tp = this.$refs.tooltip.getBoundingClientRect();
 
-                                                        if (tp.width === 0 || tp.height === 0) {
-                                                            requestAnimationFrame(() => {
-                                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
+                                                                                        if (tp.width === 0 || tp.height === 0) {
+                                                                                            requestAnimationFrame(() => {
+                                                                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
 
-                                                                // Si aún no tiene dimensiones, usar altura estimada
-                                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
-                                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
+                                                                                                // Si aún no tiene dimensiones, usar altura estimada
+                                                                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
+                                                                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
 
-                                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
-                                                            });
-                                                            return;
-                                                        }
+                                                                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                                                            });
+                                                                                            return;
+                                                                                        }
 
-                                                        this.calculatePosition(ev, tp);
-                                                    });
-                                                });
-                                            },
-                                            calculatePosition(ev, tp) {
-                                                let top = ev.top - tp.height - 12;
+                                                                                        this.calculatePosition(ev, tp);
+                                                                                    });
+                                                                                });
+                                                                            },
+                                                                            calculatePosition(ev, tp) {
+                                                                                let top = ev.top - tp.height - 12;
 
-                                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
-                                                const eventCenterX = ev.left + (ev.width / 2);
+                                                                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
+                                                                                const eventCenterX = ev.left + (ev.width / 2);
 
-                                                if (left < 10) {
-                                                    left = 10;
-                                                }
-                                                if (left + tp.width > window.innerWidth - 10) {
-                                                    left = window.innerWidth - tp.width - 10;
-                                                }
+                                                                                if (left < 10) {
+                                                                                    left = 10;
+                                                                                }
+                                                                                if (left + tp.width > window.innerWidth - 10) {
+                                                                                    left = window.innerWidth - tp.width - 10;
+                                                                                }
 
-                                                let arrowX = eventCenterX - left;
-                                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
+                                                                                let arrowX = eventCenterX - left;
+                                                                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
 
-                                                this.isBelow = false;
-                                                this.arrowX = arrowX;
-                                                this.tooltipX = left;
-                                                this.tooltipY = top;
+                                                                                this.isBelow = false;
+                                                                                this.arrowX = arrowX;
+                                                                                this.tooltipX = left;
+                                                                                this.tooltipY = top;
 
-                                            }
-                                        }" @mouseenter="showTooltip = true; positionTooltip()"
-                            @mouseleave="showTooltip = false" class="relative w-full h-full">
+                                                                            }
+                                                                        }"
+                            @mouseenter="showTooltip = true; positionTooltip()" @mouseleave="showTooltip = false"
+                            class="relative w-full h-full">
 
                             <div x-ref="event" @click="$wire.openReservaModal({{ $evento['id'] }})"
                                 class="timeline-event cursor-pointer {{ $clipClass }} {{ $evento['estado'] === 'devuelto' ? 'event-devuelto' : '' }}"
@@ -232,7 +233,7 @@
 
                                     @if(isset($evento['items']) && count($evento['items']) > 0)
                                         <div class="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                                            <div class="text-xs font-semibold mb-1 text-gray-900 dark:text-white">Items:</div>
+                                            <div class="text-xs font-semibold mb-1 text-gray-900 dark:text-white">Equipos:</div>
                                             @foreach($evento['items'] as $item)
                                                 <div class="text-xs text-gray-700 dark:text-gray-200">{{ $item }}</div>
                                             @endforeach
@@ -321,10 +322,11 @@
                 @if($record->items && $record->items->count() > 0)
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-1">
-                            <svg class="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M20 7l-8-4-8 4m16 0l-8 4m-8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            <svg class="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 32 32"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M1.735 17.832l12.054 6.081 2.152-6.081-12.053-5.758-2.153 5.758zM16.211 17.832l2.045 6.027 12.484-6.081-2.422-5.704-12.107 5.758zM-0.247 7.212l4.144 4.843 12.053-6.134-3.928-5.005-12.269 6.296zM32.247 7.319l-12.001-6.403-4.09 5.005 12.162 6.134 3.929-4.736zM3.175 19.353l-0.041 5.839 12.713 5.893v-10.98l-1.816 4.736-10.856-5.488zM16.291 20.105v10.979l12.674-5.893v-5.799l-10.99 5.46-1.684-4.747z">
+                                </path>
                             </svg>
                             Equipos reservados
                         </h3>
@@ -362,6 +364,11 @@
 
                         {{ ($this->eliminarReservaAction) }}
 
+                        <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil"
+                            size="sm" :disabled="in_array($record->estado, ['devuelto', 'completado'])">
+                            Editar
+                        </x-filament::button>
+
                         @if($record->estado === 'pendiente')
                             <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt"
                                 size="sm">
@@ -375,11 +382,6 @@
                                 Marcar como devuelto
                             </x-filament::button>
                         @endif
-
-                        <x-filament::button wire:click="editarReserva" color="primary" outlined icon="heroicon-o-pencil"
-                            size="sm" :disabled="in_array($record->estado, ['devuelto', 'completado'])">
-                            Editar
-                        </x-filament::button>
                     </div>
                 </div>
             </div>
@@ -394,6 +396,8 @@
         .calendar-grid {
             position: relative;
             overflow: visible !important;
+            grid-auto-rows: 36px;
+            row-gap: 6px;
         }
 
         .calendar-day-divider {
@@ -430,7 +434,7 @@
 
         .timeline-event-wrapper {
             position: relative;
-            height: 44px;
+            min-height: 44px;
             overflow: visible !important;
             z-index: 1;
         }
@@ -449,6 +453,18 @@
             color: #000;
             transition: all 0.15s ease;
         }
+
+        .timeline-event::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            border-radius: 6px 0 0 6px;
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
 
         .timeline-event:hover {
             box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
@@ -492,7 +508,7 @@
         }
 
         .dark .tooltip-content {
-            background-color: #2a2d34;
+            background-color: #34373F;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             border-color: #374151;
         }
@@ -507,16 +523,6 @@
             border-right: 6px solid transparent;
         }
 
-        /* Flecha apuntando hacia arriba (tooltip está debajo del evento) */
-        .tooltip-arrow-top {
-            top: -6px;
-            border-bottom: 6px solid #ffffff;
-        }
-
-        .dark .tooltip-arrow-top {
-            border-bottom-color: #2a2d34;
-        }
-
         /* Flecha apuntando hacia abajo (tooltip está arriba del evento) */
         .tooltip-arrow-bottom {
             bottom: -6px;
@@ -524,7 +530,7 @@
         }
 
         .dark .tooltip-arrow-bottom {
-            border-top-color: #2a2d34;
+            border-top-color: #34373F;
         }
 
         /* Clips para los eventos que continúan */
@@ -562,30 +568,6 @@
 
         .today-badge:hover {
             background-color: #1d4ed8 !important;
-        }
-
-        /* Efecto gris para reservas devueltas */
-        .timeline-event.event-devuelto::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(156, 163, 175, 0.6);
-            /* gray-400 con 60% opacidad */
-            border-radius: 6px;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .dark .timeline-event.event-devuelto::before {
-            background-color: rgba(75, 85, 99, 0.7);
-            /* gray-600 con 70% opacidad en modo oscuro */
-        }
-
-        .timeline-event.event-devuelto .timeline-event-content {
-            opacity: 0.85;
         }
 
         @media (max-width: 768px) {
