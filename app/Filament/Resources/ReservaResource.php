@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ReservaResource\Pages;
 use App\Models\Reserva;
 use Filament\Actions\DeleteAction;
+use Illuminate\Support\HtmlString;
+use Filament\Forms\Get;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -23,79 +25,112 @@ class ReservaResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('titulo')
-                    ->label('Título')
-                    ->required(),
-
-                Forms\Components\DateTimePicker::make('inicio')
-                    ->label('Fecha inicio')
-                    ->required(),
-
-                Forms\Components\DateTimePicker::make('fin')
-                    ->label('Fecha fin')
-                    ->required()
-                    ->rules([
-                        function (\Filament\Forms\Get $get) {
-                            return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                $inicio = $get('inicio');
-                                if ($inicio && $value && $value < $inicio) {
-                                    $fail('La fecha de fin no puede ser anterior a la fecha de inicio.');
-                                }
-                            };
-                        },
-                    ]),
-
-                Forms\Components\Repeater::make('items')
-                    ->label('Equipos reservados')
-                    ->relationship()
+                Forms\Components\Grid::make(1)
                     ->schema([
-                        Forms\Components\Select::make('equipo_id')
-                            ->label('Equipo')
-                            ->relationship('equipo', 'nombre')
+                        // 🧩 TÍTULO ocupa toda la parte superior
+                        Forms\Components\TextInput::make('titulo')
+                            ->label('Título')
                             ->required()
-                            ->preload()
-                            ->searchable()
-                            ->reactive()
-                            ->getOptionLabelFromRecordUsing(function ($record, \Filament\Forms\Get $get) {
-                                $inicio = $get('../../inicio');
-                                $fin = $get('../../fin');
+                            ->columnSpanFull(),
 
-                                if ($inicio && $fin) {
-                                    $disponibles = $record->disponibleEnRango($inicio, $fin);
-                                    return "{$record->nombre} (Disponibles: {$disponibles})";
-                                }
+                        // 📅 FECHAS en la misma fila
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DateTimePicker::make('inicio')
+                                    ->label('Fecha inicio')
+                                    ->required(),
 
-                                return $record->nombre;
-                            }),
+                                Forms\Components\DateTimePicker::make('fin')
+                                    ->label('Fecha fin')
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $inicio = $get('inicio');
 
-                        Forms\Components\TextInput::make('cantidad')
-                            ->label('Cantidad')
-                            ->numeric()
-                            ->minValue(1)
-                            ->required()
-                            ->rules([
-                                function (\Filament\Forms\Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                        $equipoId = $get('equipo_id');
+                                        if ($inicio && $state && $state < $inicio) {
+                                            // Reset y mensaje inmediato
+                                            $set('fin', null);
+                                            $set('error_fin', 'La fecha de fin no puede ser anterior a la fecha de inicio.');
+                                        } else {
+                                            $set('error_fin', null);
+                                        }
+                                    })
+                                    ->helperText(function (Get $get) {
+                                        $error = $get('error_fin');
+
+                                        if ($error) {
+                                            // 🔴 Rojo en error (modo claro/oscuro)
+                                            return new HtmlString(
+                                                '<span class="text-danger-600 dark:text-danger-500 font-medium">'
+                                                . e($error) .
+                                                '</span>'
+                                            );
+                                        }
+                                    }),
+                            ]),
+
+                        // 🧰 REPEATER en una sola línea (fila compacta)
+                        Forms\Components\Repeater::make('items')
+                            ->label('Equipos reservados')
+                            ->relationship()
+                            ->schema([
+                                Forms\Components\Select::make('equipo_id')
+                                    ->label('Equipo')
+                                    ->relationship('equipo', 'nombre')
+                                    ->required()
+                                    ->preload()
+                                    ->searchable()
+                                    ->reactive()
+                                    ->options(function (Get $get) {
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
 
-                                        if ($equipoId && $inicio && $fin) {
-                                            $equipo = \App\Models\Equipo::find($equipoId);
-                                            if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin)) {
-                                                $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
-                                            }
+                                        // Si no hay fechas seleccionadas, no mostrar opciones
+                                        if (!$inicio || !$fin) {
+                                            return [];
                                         }
-                                    };
-                                },
-                            ]),
-                    ])
-                    ->minItems(1)
-                    ->columns(2)
-                    ->createItemButtonLabel('Agregar equipo'),
+
+                                        // Si hay fechas, mostrar equipos con disponibilidad
+                                        return \App\Models\Equipo::all()
+                                            ->pluck('nombre', 'id')
+                                            ->map(function ($nombre, $id) use ($inicio, $fin) {
+                                            $equipo = \App\Models\Equipo::find($id);
+                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin);
+                                            return "{$nombre} (Disponibles: {$disponibles})";
+                                        });
+                                    })
+                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')), // 👈 Deshabilita el select
+
+                                Forms\Components\TextInput::make('cantidad')
+                                    ->label('Cantidad')
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->required()
+                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')) // 👈 Deshabilita el select
+                                    ->rules([
+                                        function (\Filament\Forms\Get $get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                $equipoId = $get('equipo_id');
+                                                $inicio = $get('../../inicio');
+                                                $fin = $get('../../fin');
+
+                                                if ($equipoId && $inicio && $fin) {
+                                                    $equipo = \App\Models\Equipo::find($equipoId);
+                                                    if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin)) {
+                                                        $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                                    }
+                                                }
+                                            };
+                                        },
+                                    ]),
+                            ])
+                            ->minItems(1)
+                            ->columns(2) // equipo + cantidad en una sola línea
+                            ->createItemButtonLabel('Agregar equipo')
+                            ->columnSpanFull(), // ocupa el ancho total
+                    ]),
             ]);
     }
-
 
     public static function table(Table $table): Table
     {
@@ -183,8 +218,9 @@ class ReservaResource extends Resource
     {
         return [
             'index' => Pages\ListReservas::route('/'),
-            'create' => Pages\CreateReserva::route('/create'),
-            'edit' => Pages\EditReserva::route('/{record}/edit'),
+            // 'create' => Pages\CreateReserva::route('/create'),
+            // 'edit' => Pages\EditReserva::route('/{record}/edit'),
         ];
     }
+
 }
