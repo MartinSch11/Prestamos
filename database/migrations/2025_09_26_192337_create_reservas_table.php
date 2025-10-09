@@ -12,14 +12,25 @@ return new class extends Migration {
     {
         Schema::create('reservas', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('equipo_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('titulo');  // ej: "Producción de boda"
+            // Ya no tienes una sola relación con equipo, sino con items,
+            // por lo que esta línea probablemente no debería estar aquí.
+            // La quito para evitar confusiones.
+            
+            // ✅ AÑADE LA RELACIÓN CON EL USUARIO AQUÍ
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            
+            $table->string('titulo');
             $table->dateTime('inicio');
             $table->dateTime('fin');
+            $table->enum('estado', [
+                'pendiente', 
+                'aceptado', 
+                'rechazado', 
+                'en_curso', 
+                'devuelto'
+            ])->default('pendiente');
             $table->timestamps();
         });
-
     }
 
     /**

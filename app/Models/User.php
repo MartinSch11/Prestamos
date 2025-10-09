@@ -3,7 +3,9 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -21,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'es_admin',
     ];
 
     /**
@@ -33,6 +36,19 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if ($panel->getId() === 'admin') {
+            return $this->es_admin; // Solo si es_admin es true
+        }
+
+        if ($panel->getId() === 'alumno') {
+            return !$this->es_admin; // Solo si NO es admin
+        }
+
+        return true;
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -44,5 +60,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function reservas(): HasMany
+    {
+        return $this->hasMany(Reserva::class);
     }
 }

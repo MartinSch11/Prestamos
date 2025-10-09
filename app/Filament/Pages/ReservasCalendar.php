@@ -4,12 +4,16 @@ namespace App\Filament\Pages;
 
 use App\Models\Equipo;
 use App\Models\Reserva;
+use App\Notifications\NuevaReservaNotification;
+use App\Notifications\ReservaEstadoNotification;
 use Carbon\Carbon;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms;
+use Illuminate\Notifications\DatabaseNotification;
 use Filament\Forms\Get;
 
 class ReservasCalendar extends Page implements HasActions
@@ -23,6 +27,12 @@ class ReservasCalendar extends Page implements HasActions
     public $weekOffset = 0;
     public ?Reserva $record = null;
 
+    protected function getListeners(): array
+    {
+        return [
+            'refreshCalendar' => '$refresh',
+        ];
+    }
     public function getWeekStart(): Carbon
     {
         return now()->startOfWeek(Carbon::MONDAY)->addWeeks($this->weekOffset)->startOfDay();
@@ -89,84 +99,103 @@ class ReservasCalendar extends Page implements HasActions
         $this->dispatch('close-modal', id: 'reserva-modal');
     }
 
+    // Acciones de los Botones (Lógica nueva y refactorizada)
+
+    public function aceptarReserva()
+    {
+        if ($this->record && $this->record->estado === 'pendiente') {
+            $this->actualizarEstado('aceptado', 'Reserva Aceptada');
+        }
+    }
+
+    public function rechazarReserva()
+    {
+        if ($this->record && $this->record->estado === 'pendiente') {
+            $this->actualizarEstado('rechazado', 'Reserva Rechazada');
+        }
+    }
+
     public function marcarEnCurso()
     {
-        if (!$this->record) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error: No se encontró la reserva')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        try {
-            $this->record->update(['estado' => 'en_curso']);
-
-            \Filament\Notifications\Notification::make()
-                ->title('Reserva marcada en curso')
-                ->success()
-                ->send();
-
-            $this->closeReservaModal();
-            $this->dispatch('$refresh');
-
-        } catch (\Exception $e) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error al actualizar la reserva')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
+        if ($this->record && $this->record->estado === 'aceptado') {
+            $this->actualizarEstado('en_curso', 'Reserva marcada como "en curso"');
         }
     }
 
     public function marcarDevuelto()
     {
+        if ($this->record && $this->record->estado === 'en_curso') {
+            $this->actualizarEstado('devuelto', 'Reserva marcada como "devuelta"');
+        }
+    }
+
+    private function actualizarEstado(string $nuevoEstado, string $mensajeExito): void
+    {
         if (!$this->record) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error: No se encontró la reserva')
-                ->danger()
-                ->send();
+            Notification::make()->title('Error')->body('No se encontró la reserva para actualizar.')->danger()->send();
             return;
         }
 
         try {
-            $this->record->update(['estado' => 'devuelto']);
+            $this->record->update(['estado' => $nuevoEstado]);
+            Notification::make()->title($mensajeExito)->success()->send();
 
-            \Filament\Notifications\Notification::make()
-                ->title('Reserva marcada como devuelta')
-                ->success()
-                ->send();
+            // Notificamos al alumno también desde el calendario
+            if ($nuevoEstado === 'aceptado' || $nuevoEstado === 'rechazado') {
+                $this->record->user->notify(new ReservaEstadoNotification($this->record, $nuevoEstado));
+            }
+            $this->actualizarNotificacionAsociada($this->record, $nuevoEstado);
 
             $this->closeReservaModal();
-            $this->dispatch('$refresh');
+            $this->dispatch('refreshCalendar');
 
         } catch (\Exception $e) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error al actualizar la reserva')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
+            Notification::make()->title('Error al actualizar la reserva')->body($e->getMessage())->danger()->send();
+        }
+    }
+
+    private function actualizarNotificacionAsociada(Reserva $reserva, string $estadoAccion): void
+    {
+        $reserva->loadMissing('user');
+
+        $notificaciones = DatabaseNotification::query()
+            ->where('type', NuevaReservaNotification::class)
+            ->where('data->reserva_id', $reserva->id)
+            ->get();
+
+        foreach ($notificaciones as $notificacion) {
+            $datos = $notificacion->data;
+
+            // Quitamos los botones de acción para que no aparezcan más
+            unset($datos['actions']);
+            $datos['body'] = "La reserva de {$reserva->user->name} fue {$estadoAccion}.";
+
+            // Actualizamos la notificación y la marcamos como leída
+            $notificacion->update([
+                'data' => $datos,
+                'read_at' => now()
+            ]);
         }
     }
 
     public function editarReserva()
     {
         if (!$this->record) {
-            \Filament\Notifications\Notification::make()
-                ->title('Error: No se encontró la reserva')
-                ->danger()
-                ->send();
+            Notification::make()->title('Error')->body('No se encontró la reserva para editar.')->danger()->send();
             return;
         }
-
         $this->mountAction('edit');
     }
+
+    // --- Definición de Acciones de Filament (sin cambios) ---
+    // El código de los formularios, etc. se mantiene igual.
 
     protected function getActions(): array
     {
         return [
             $this->editAction()->visible(false),
             $this->eliminarReservaAction()->visible(false),
+            $this->crearReservaAction(),
         ];
     }
 
@@ -178,7 +207,7 @@ class ReservasCalendar extends Page implements HasActions
             ->color('danger')
             ->outlined()
             ->size('sm')
-            ->disabled(fn() => $this->record && in_array($this->record->estado, ['en_curso','devuelto', 'completado']))
+            ->disabled(fn() => $this->record && in_array($this->record->estado, ['en_curso', 'devuelto', 'completado']))
             ->requiresConfirmation()
             ->modalHeading('Eliminar reserva')
             ->modalDescription('¿Estás seguro de que deseas eliminar esta reserva? Esta acción no se puede deshacer.')

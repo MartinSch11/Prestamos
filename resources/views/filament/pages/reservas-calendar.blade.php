@@ -127,77 +127,82 @@
                                 ($continuaDespues ? 'clip-right' : 'clip-'));
 
                         // Paleta
-                        $bgColor = match ($evento['estado']) { 'pendiente' => '#FEDBB2', // azul pastel oscuro (Tailwind blue-300)
-                            'en_curso' => '#A3D6F0', // ámbar pastel oscuro (Tailwind amber-300)
-                            'devuelto' => '#93CFA4', // verde pastel oscuro (Tailwind green-300)
-                            'bloqueado' => '#FFCFCF', // rojo pastel oscuro (Tailwind red-300)
-                            default => '#D1D5DB', // gris pastel oscuro (Tailwind gray-300)
+
+                        $bgColor = match ($evento['estado']) {
+                            'pendiente' => '#FDE68A',    // Amarillo pastel
+                            'aceptado' => '#A7F3D0',     // Verde menta pastel
+                            'rechazado' => '#FECACA',    // Rojo pastel
+                            'en_curso' => '#BFDBFE',     // Azul cielo
+                            'devuelto' => '#DDD6FE',     // Lavanda pastel
+                            default => '#E5E7EB',
                         };
 
                         $estadoLabel = match ($evento['estado']) {
                             'pendiente' => 'Pendiente',
+                            'aceptado' => 'Aceptado',
+                            'rechazado' => 'Rechazado',
                             'en_curso' => 'En Curso',
                             'devuelto' => 'Devuelto',
-                            'bloqueado' => 'Bloqueado',
                             default => 'Sin estado'
                         };
                     @endphp
 
                     <div class="timeline-event-wrapper"
-                        style="grid-column: {{ $startDay + 1 }} / span {{ $span }}; grid-row: {{ $row }}; padding: 3px 6px;">
+                        style="grid-column: {{ $startDay + 1 }} / span {{ $span }}; grid-row: {{ $row }}; padding: 3px 6px;"
+                        @mouseenter="$el.style.zIndex = 50" @mouseleave="$el.style.zIndex = 1">
 
                         <div x-data="{
-                                                                showTooltip: false,
-                                                                tooltipX: 0,
-                                                                tooltipY: 0,
-                                                                arrowX: 0,
-                                                                isBelow: false,
-                                                                positionTooltip() {
-                                                                this.$nextTick(() => {
-                                                                this.$nextTick(() => {
-                                                                const ev = this.$refs.event.getBoundingClientRect();
-                                                                const tp = this.$refs.tooltip.getBoundingClientRect();
+                                                                                showTooltip: false,
+                                                                                tooltipX: 0,
+                                                                                tooltipY: 0,
+                                                                                arrowX: 0,
+                                                                                isBelow: false,
+                                                                                positionTooltip() {
+                                                                                this.$nextTick(() => {
+                                                                                this.$nextTick(() => {
+                                                                                const ev = this.$refs.event.getBoundingClientRect();
+                                                                                const tp = this.$refs.tooltip.getBoundingClientRect();
 
-                                                                                        if (tp.width === 0 || tp.height === 0) {
-                                                                                            requestAnimationFrame(() => {
-                                                                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
+                                                                                                        if (tp.width === 0 || tp.height === 0) {
+                                                                                                            requestAnimationFrame(() => {
+                                                                                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
 
-                                                                                                // Si aún no tiene dimensiones, usar altura estimada
-                                                                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
-                                                                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
+                                                                                                                // Si aún no tiene dimensiones, usar altura estimada
+                                                                                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
+                                                                                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
 
-                                                                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
-                                                                                            });
-                                                                                            return;
-                                                                                        }
+                                                                                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                                                                            });
+                                                                                                            return;
+                                                                                                        }
 
-                                                                                        this.calculatePosition(ev, tp);
-                                                                                    });
-                                                                                });
-                                                                            },
-                                                                            calculatePosition(ev, tp) {
-                                                                                let top = ev.top - tp.height - 12;
+                                                                                                        this.calculatePosition(ev, tp);
+                                                                                                    });
+                                                                                                });
+                                                                                            },
+                                                                                            calculatePosition(ev, tp) {
+                                                                                                let top = ev.top - tp.height - 12;
 
-                                                                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
-                                                                                const eventCenterX = ev.left + (ev.width / 2);
+                                                                                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
+                                                                                                const eventCenterX = ev.left + (ev.width / 2);
 
-                                                                                if (left < 10) {
-                                                                                    left = 10;
-                                                                                }
-                                                                                if (left + tp.width > window.innerWidth - 10) {
-                                                                                    left = window.innerWidth - tp.width - 10;
-                                                                                }
+                                                                                                if (left < 10) {
+                                                                                                    left = 10;
+                                                                                                }
+                                                                                                if (left + tp.width > window.innerWidth - 10) {
+                                                                                                    left = window.innerWidth - tp.width - 10;
+                                                                                                }
 
-                                                                                let arrowX = eventCenterX - left;
-                                                                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
+                                                                                                let arrowX = eventCenterX - left;
+                                                                                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
 
-                                                                                this.isBelow = false;
-                                                                                this.arrowX = arrowX;
-                                                                                this.tooltipX = left;
-                                                                                this.tooltipY = top;
+                                                                                                this.isBelow = false;
+                                                                                                this.arrowX = arrowX;
+                                                                                                this.tooltipX = left;
+                                                                                                this.tooltipY = top;
 
-                                                                            }
-                                                                        }"
+                                                                                            }
+                                                                                        }"
                             @mouseenter="showTooltip = true; positionTooltip()" @mouseleave="showTooltip = false"
                             class="relative w-full h-full">
 
@@ -362,26 +367,37 @@
                 <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div class="flex items-center justify-end gap-3">
 
-                        {{ ($this->eliminarReservaAction) }}
-
-                        <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil"
-                            size="sm" :disabled="in_array($record->estado, ['devuelto', 'completado'])">
-                            Editar
-                        </x-filament::button>
-
-                        @if($record->estado === 'pendiente')
-                            <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt"
+                        @if ($record->estado === 'pendiente')
+                            <x-filament::button wire:click="aceptarReserva" color="success" icon="heroicon-o-check" size="sm">
+                                Aceptar
+                            </x-filament::button>
+                            <x-filament::button wire:click="rechazarReserva" color="danger" outlined icon="heroicon-o-x-mark"
                                 size="sm">
+                                Rechazar
+                            </x-filament::button>
+
+                        @elseif ($record->estado === 'aceptado')
+                            <x-filament::button wire:click="marcarEnCurso" color="info" icon="heroicon-o-bolt" size="sm">
                                 Marcar en curso
                             </x-filament::button>
-                        @endif
 
-                        @if($record->estado === 'en_curso')
-                            <x-filament::button wire:click="marcarDevuelto" color="success" outlined
-                                icon="heroicon-o-check-circle" size="sm">
+                        @elseif ($record->estado === 'en_curso')
+                            <x-filament::button wire:click="marcarDevuelto" color="primary" icon="heroicon-o-check-circle"
+                                size="sm">
                                 Marcar como devuelto
                             </x-filament::button>
                         @endif
+
+                        {{-- El botón de editar solo aparece si no está devuelta o rechazada --}}
+                        @if (!in_array($record->estado, ['devuelto', 'rechazado']))
+                            <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil"
+                                size="sm">
+                                Editar
+                            </x-filament::button>
+                        @endif
+
+                        {{ ($this->eliminarReservaAction) }}
+
                     </div>
                 </div>
             </div>
