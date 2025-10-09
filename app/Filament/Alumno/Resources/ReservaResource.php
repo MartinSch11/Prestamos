@@ -75,7 +75,7 @@ class ReservaResource extends Resource
 
                         // 🧰 REPEATER en una sola línea (fila compacta)
                         Forms\Components\Repeater::make('items')
-                            ->label('Equipos reservados')
+                            ->label('Equipos')
                             ->relationship()
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
@@ -129,7 +129,7 @@ class ReservaResource extends Resource
                                     ->required()
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')) // 👈 Deshabilita el select
                                     ->rules([
-                                        function (\Filament\Forms\Get $get) {
+                                        function (Get $get) {
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
                                                 $equipoId = $get('equipo_id');
                                                 $inicio = $get('../../inicio');
@@ -147,7 +147,7 @@ class ReservaResource extends Resource
                             ])
                             ->minItems(1)
                             ->columns(2) // equipo + cantidad en una sola línea
-                            ->createItemButtonLabel('Agregar equipo')
+                            ->createItemButtonLabel(label: 'Añadir equipo')
                             ->columnSpanFull(), // ocupa el ancho total
                     ]),
             ]);
