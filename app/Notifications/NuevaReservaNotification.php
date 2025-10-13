@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Filament\Pages\ReservasCalendar;
 use App\Models\Reserva;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,27 +17,16 @@ class NuevaReservaNotification extends Notification
 
     public $reserva;
 
-    /**
-     * Create a new notification instance.
-     */
     public function __construct(Reserva $reserva)
     {
         $this->reserva = $reserva;
     }
 
-    /**
-     * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
-     */
     public function via(object $notifiable): array
     {
         return ['database'];
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
@@ -45,11 +35,6 @@ class NuevaReservaNotification extends Notification
             ->line('Thank you for using our application!');
     }
 
-    /**
-     * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(object $notifiable): array
     {
         return [
@@ -61,18 +46,31 @@ class NuevaReservaNotification extends Notification
     {
         $this->reserva->loadMissing('user');
 
-        return FilamentNotification::make()
-            ->title('Nueva reserva pendiente')
-            ->body('El alumno ' . $this->reserva->user->name . ' ha solicitado una nueva reserva.')
-            ->actions([
-                Action::make('Aceptar')
-                    ->url(route('reservas.aceptar', $this->reserva->id))
-                    ->button(),
-                Action::make('Rechazar')
-                    ->url(route('reservas.rechazar', $this->reserva->id))
-                    ->color('danger')
-                    ->button(),
-            ])
-            ->getDatabaseMessage() + ['reserva_id' => $this->reserva->id];
+        $calendarUrl = ReservasCalendar::getUrl(
+            parameters: ['reserva' => $this->reserva->id],
+            panel: 'admin'
+        );
+
+        // Filament detectará automáticamente la clave 'url' y hará la notificación clickable
+        return [
+            'title' => 'Nueva reserva pendiente',
+            'body' => 'El alumno ' . $this->reserva->user->name . ' ha solicitado una nueva reserva.',
+            'icon' => 'heroicon-o-calendar',
+            'color' => 'warning',
+            'reserva_id' => $this->reserva->id,
+            'url' => $calendarUrl,
+            'actions' => [
+                [
+                    'name' => 'Aceptar',
+                    'url' => route('reservas.aceptar', $this->reserva->id),
+                    'color' => 'primary',
+                ],
+                [
+                    'name' => 'Rechazar',
+                    'url' => route('reservas.rechazar', $this->reserva->id),
+                    'color' => 'danger',
+                ],
+            ],
+        ];
     }
 }

@@ -14,26 +14,17 @@ class ReservaEstadoNotification extends Notification
     protected $reserva;
     protected $estado;
 
-    /**
-     * Create a new notification instance.
-     */
     public function __construct(Reserva $reserva, string $estado)
     {
         $this->reserva = $reserva;
         $this->estado = $estado;
     }
 
-    /**
-     * Get the notification's delivery channels.
-     */
     public function via(object $notifiable): array
     {
         return ['database'];
     }
 
-    /**
-     * Get the array representation of the notification.
-     */
     public function toDatabase(object $notifiable): array
     {
         // 1. Se obtiene el estado de la reserva

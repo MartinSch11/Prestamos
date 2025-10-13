@@ -35,6 +35,7 @@ class AlumnoPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
+            ->topNavigation()
             ->databaseNotifications()
             ->discoverWidgets(in: app_path('Filament/Alumno/Widgets'), for: 'App\\Filament\\Alumno\\Widgets')
             ->widgets([

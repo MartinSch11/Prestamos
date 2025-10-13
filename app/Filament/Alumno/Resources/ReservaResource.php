@@ -28,10 +28,8 @@ class ReservaResource extends Resource
             ->schema([
                 Forms\Components\Grid::make(1)
                     ->schema([
-                        // 🧩 TÍTULO ocupa toda la parte superior
                         Forms\Components\TextInput::make('titulo')
                             ->label('Título')
-                            // ✅ Añade esta línea para el valor por defecto
                             ->default('Reserva ' . auth()->user()->name)
                             ->readOnly()
                             ->required()
@@ -42,6 +40,7 @@ class ReservaResource extends Resource
                             ->schema([
                                 Forms\Components\DateTimePicker::make('inicio')
                                     ->label('Fecha inicio')
+                                    ->minDate(now())
                                     ->required(),
 
                                 Forms\Components\DateTimePicker::make('fin')
@@ -73,13 +72,13 @@ class ReservaResource extends Resource
                                     }),
                             ]),
 
-                        // 🧰 REPEATER en una sola línea (fila compacta)
                         Forms\Components\Repeater::make('items')
                             ->label('Equipos')
                             ->relationship()
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
                                     ->label('Equipo')
+                                    ->columnSpan(4)
                                     ->required()
                                     ->preload()
                                     ->searchable()
@@ -124,6 +123,7 @@ class ReservaResource extends Resource
 
                                 Forms\Components\TextInput::make('cantidad')
                                     ->label('Cantidad')
+                                    ->columnSpan(1)
                                     ->numeric()
                                     ->minValue(1)
                                     ->required()
@@ -146,10 +146,10 @@ class ReservaResource extends Resource
                                     ]),
                             ])
                             ->minItems(1)
-                            ->columns(2) // equipo + cantidad en una sola línea
+                            ->columns(5) // equipo + cantidad en una sola línea
                             ->createItemButtonLabel(label: 'Añadir equipo')
                             ->columnSpanFull(), // ocupa el ancho total
-                    ]),
+                    ])
             ]);
     }
 
@@ -209,7 +209,7 @@ class ReservaResource extends Resource
                     ->requiresConfirmation()
                     ->visible(fn(Reserva $record) => $record->estado === 'pendiente'),
             ])
-            ->defaultSort('inicio', 'desc'); // 👉 Orden por defecto descendente
+            ->defaultSort('inicio', direction: 'desc'); // 👉 Orden por defecto descendente
     }
 
     public static function getRelations(): array

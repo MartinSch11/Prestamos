@@ -4,14 +4,17 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReservaResource\Pages;
 use App\Models\Reserva;
-use Filament\Actions\DeleteAction;
-use Illuminate\Support\HtmlString;
-use Filament\Forms\Get;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
+use Filament\Forms\Get;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class ReservaResource extends Resource
 {
@@ -25,13 +28,27 @@ class ReservaResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Grid::make(1)
+                Forms\Components\Grid::make(2)
                     ->schema([
-                        // 🧩 TÍTULO ocupa toda la parte superior
+                        Forms\Components\Select::make('user_id')
+                            ->label('Alumno')
+                            ->options(User::where('es_admin', false)->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->reactive() // Hacemos que el formulario reaccione a los cambios
+                            ->afterStateUpdated(function (Set $set, ?string $state) {
+                                // Cuando se selecciona un alumno, autocompletamos el título
+                                if ($state) {
+                                    $userName = User::find($state)?->name;
+                                    $set('titulo', 'Reserva de ' . $userName);
+                                } else {
+                                    $set('titulo', null);
+                                }
+                            }),
                         Forms\Components\TextInput::make('titulo')
                             ->label('Título')
-                            ->required()
-                            ->columnSpanFull(),
+                            ->required(),
 
                         // 📅 FECHAS en la misma fila
                         Forms\Components\Grid::make(2)
@@ -69,46 +86,63 @@ class ReservaResource extends Resource
                                     }),
                             ]),
 
-                        // 🧰 REPEATER en una sola línea (fila compacta)
                         Forms\Components\Repeater::make('items')
-                            ->label('Equipos reservados')
-                            ->relationship()
+                            ->label('Equipos')
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
                                     ->label('Equipo')
-                                    ->relationship('equipo', 'nombre')
+                                    ->columnSpan(4)
                                     ->required()
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
-                                    ->options(function (Get $get) {
+                                    ->options(function (Get $get, ?string $state): array { // Se añade $state
+                            
+                                        // Obtenemos los equipos ya seleccionados en OTRAS filas
+                                        $selectedIds = collect($get('../../items'))
+                                            ->pluck('equipo_id')
+                                            ->filter()
+                                            ->all();
+
+                                        // Obtenemos las fechas para verificar disponibilidad
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
 
-                                        // Si no hay fechas seleccionadas, no mostrar opciones
+                                        // Si no hay fechas, no mostramos opciones
                                         if (!$inicio || !$fin) {
+                                            // Si estamos editando, al menos mostramos el item actual
+                                            if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
+                                                return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
+                                            }
                                             return [];
                                         }
 
-                                        // Si hay fechas, mostrar equipos con disponibilidad
-                                        return \App\Models\Equipo::all()
-                                            ->pluck('nombre', 'id')
-                                            ->map(function ($nombre, $id) use ($inicio, $fin) {
-                                            $equipo = \App\Models\Equipo::find($id);
-                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin);
-                                            return "{$nombre} (Disponibles: {$disponibles})";
+                                        // Creamos la consulta base de equipos
+                                        $query = \App\Models\Equipo::query()
+                                            // Filtramos los equipos ya seleccionados,
+                                            // PERO siempre incluimos el de la fila actual (`$state`)
+                                            ->where(function ($query) use ($selectedIds, $state) {
+                                            $query->whereNotIn('id', $selectedIds)
+                                                ->orWhere('id', $state);
                                         });
+
+                                        // Mapeamos los resultados para añadir la info de disponibilidad
+                                        return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin) {
+                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin);
+                                            return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
+                                        })->toArray();
                                     })
-                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')), // 👈 Deshabilita el select
+                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
 
                                 Forms\Components\TextInput::make('cantidad')
                                     ->label('Cantidad')
+                                    ->columnSpan(1)
                                     ->numeric()
                                     ->minValue(1)
                                     ->required()
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')) // 👈 Deshabilita el select
                                     ->rules([
-                                        function (\Filament\Forms\Get $get) {
+                                        function (Get $get) {
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
                                                 $equipoId = $get('equipo_id');
                                                 $inicio = $get('../../inicio');
@@ -125,10 +159,10 @@ class ReservaResource extends Resource
                                     ]),
                             ])
                             ->minItems(1)
-                            ->columns(2) // equipo + cantidad en una sola línea
-                            ->createItemButtonLabel('Agregar equipo')
+                            ->columns(5) // equipo + cantidad en una sola línea
+                            ->createItemButtonLabel(label: 'Añadir equipo')
                             ->columnSpanFull(), // ocupa el ancho total
-                    ]),
+                    ])
             ]);
     }
 
@@ -151,18 +185,19 @@ class ReservaResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('estado')
-                    ->label('Estado')
-                    ->badge()
-                    ->colors([
-                        'warning' => 'pendiente',
-                        'info' => 'en_curso',
-                        'success' => 'devuelto',
-                    ])
+                Tables\Columns\TextColumn::make('estado')->badge()->colors([
+                    'warning' => 'pendiente',
+                    'success' => 'aceptado',
+                    'danger' => 'rechazado',
+                    'info' => 'en_curso',
+                    'primary' => 'devuelto',
+                ])
                     ->formatStateUsing(fn(string $state): string => match ($state) {
                         'pendiente' => 'Pendiente',
                         'en_curso' => 'En curso',
                         'devuelto' => 'Devuelto',
+                        'aceptado' => 'Aceptado',
+                        'rechazado' => 'Rechazado',
                         default => ucfirst($state),
                     }),
 
@@ -175,6 +210,8 @@ class ReservaResource extends Resource
                     ->label('Estado')
                     ->options([
                         'pendiente' => 'Pendiente',
+                        'aceptado' => 'Aceptado',
+                        'rechazado' => 'Rechazado',
                         'en_curso' => 'En curso',
                         'devuelto' => 'Devuelto',
                     ]),
@@ -192,7 +229,7 @@ class ReservaResource extends Resource
                         ->icon('heroicon-o-play')
                         ->color('warning')
                         ->requiresConfirmation()
-                        ->visible(fn(Reserva $record) => $record->estado === 'pendiente')
+                        ->visible(fn(Reserva $record) => $record->estado === 'aceptado')
                         ->action(fn(Reserva $record) => $record->update(['estado' => 'en_curso'])),
 
                     Tables\Actions\Action::make('devolver')
@@ -218,7 +255,7 @@ class ReservaResource extends Resource
     {
         return [
             'index' => Pages\ListReservas::route('/'),
-            // 'create' => Pages\CreateReserva::route('/create'),
+            'create' => Pages\CreateReserva::route('/create'),
             // 'edit' => Pages\EditReserva::route('/{record}/edit'),
         ];
     }
