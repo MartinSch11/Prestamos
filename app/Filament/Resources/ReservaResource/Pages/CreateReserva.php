@@ -21,7 +21,5 @@ class CreateReserva extends CreateRecord
     {
         $reserva = $this->getRecord();
         $admins = User::where('es_admin', true)->get();
-
-        Notification::send($admins, new NuevaReservaNotification($reserva));
     }
 }

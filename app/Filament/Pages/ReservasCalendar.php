@@ -197,10 +197,9 @@ class ReservasCalendar extends Page implements HasActions
             Notification::make()->title('Error')->body('No se encontró la reserva para editar.')->danger()->send();
             return;
         }
-        $this->mountAction('edit');
-    }
 
-    // --- Definición de Acciones de Filament  ---
+        $this->mountAction('edit', ['record' => $this->record->id]);
+    }
 
     protected function getActions(): array
     {
@@ -210,7 +209,6 @@ class ReservasCalendar extends Page implements HasActions
             $this->crearReservaAction(),
         ];
     }
-
     protected function eliminarReservaAction(): Action
     {
         return Action::make('eliminarReserva')
@@ -227,7 +225,7 @@ class ReservasCalendar extends Page implements HasActions
             ->modalCancelActionLabel('Cancelar')
             ->action(function () {
                 if (!$this->record) {
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Error: No se encontró la reserva')
                         ->danger()
                         ->send();
@@ -237,7 +235,7 @@ class ReservasCalendar extends Page implements HasActions
                 try {
                     $this->record->delete();
 
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Reserva eliminada exitosamente')
                         ->success()
                         ->send();
@@ -246,7 +244,7 @@ class ReservasCalendar extends Page implements HasActions
                     $this->dispatch('$refresh');
 
                 } catch (\Exception $e) {
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Error al eliminar la reserva')
                         ->body($e->getMessage())
                         ->danger()
@@ -254,19 +252,20 @@ class ReservasCalendar extends Page implements HasActions
                 }
             });
     }
-
     protected function editAction(): Action
     {
         return Action::make('edit')
             ->label('Editar Reserva')
             ->modalHeading('Editar Reserva')
-            ->modalWidth('2xl')
+            ->modalWidth('4xl')
+            ->record(fn() => $this->record)
             ->fillForm(function () {
                 if (!$this->record) {
                     return [];
                 }
 
                 return [
+                    'user_id' => $this->record->user_id,
                     'titulo' => $this->record->titulo,
                     'inicio' => $this->record->inicio,
                     'fin' => $this->record->fin,
@@ -326,34 +325,31 @@ class ReservasCalendar extends Page implements HasActions
                     ->schema([
                         Forms\Components\Select::make('equipo_id')
                             ->label('Equipo')
+                            ->live(onBlur: true)
                             ->columnSpan(4)
                             ->required()
                             ->preload()
                             ->searchable()
-                            ->reactive()
+                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                             ->options(function (Get $get, ?string $state): array {
-                                $selectedIds = collect($get('../../items'))->pluck('equipo_id')->filter()->all();
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
-                                $reservaId = $get('../../id'); // ID de la reserva actual
-                                        
+                                $reservaId = $get('../../id');
+
                                 if (!$inicio || !$fin) {
-                                    if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
+                                    if ($state && $equipoActual = Equipo::find($state)) {
                                         return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
                                     }
                                     return [];
                                 }
-                                $query = \App\Models\Equipo::query()
-                                    ->where(function ($query) use ($selectedIds, $state) {
-                                        $query->whereNotIn('id', $selectedIds)
-                                            ->orWhere('id', $state);
-                                    });
 
-                                // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
-                                return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                return Equipo::query()
+                                    ->get()
+                                    ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
                                     $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                     return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                })->toArray();
+                                })
+                                    ->toArray();
                             })
                             ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
                         Forms\Components\TextInput::make('cantidad')
@@ -372,11 +368,10 @@ class ReservasCalendar extends Page implements HasActions
                                         $reservaId = $get('../../id');
 
                                         if ($equipoId && $inicio && $fin) {
-                                            $equipo = \App\Models\Equipo::find($equipoId);
+                                            $equipo = Equipo::find($equipoId);
 
-                                            // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
                                             if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
-                                                $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                                $fail("No hay suficientes equipos disponibles");
                                             }
                                         }
                                     };
@@ -385,12 +380,12 @@ class ReservasCalendar extends Page implements HasActions
                     ])
                     ->minItems(1)
                     ->columns(5)
-                    ->createItemButtonLabel(label: 'Añadir equipo')
+                    ->addActionLabel(label: 'Añadir equipo')
                     ->columnSpanFull(),
             ])
             ->action(function (array $data) {
                 if (!$this->record) {
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Error: No se encontró la reserva')
                         ->danger()
                         ->send();
@@ -415,7 +410,7 @@ class ReservasCalendar extends Page implements HasActions
                         }
                     }
 
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Reserva actualizada exitosamente')
                         ->success()
                         ->send();
@@ -424,7 +419,7 @@ class ReservasCalendar extends Page implements HasActions
                     $this->dispatch('$refresh');
 
                 } catch (\Exception $e) {
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Error al actualizar la reserva')
                         ->body($e->getMessage())
                         ->danger()
@@ -451,27 +446,29 @@ class ReservasCalendar extends Page implements HasActions
                 'class' => 'border-none font-medium bg-transparent hover:bg-gray-100 text-gray-700 shadow-none'
             ])
             ->modalHeading('Nueva Reserva')
-            ->modalWidth('2xl')
+            ->modalWidth('4xl')
             ->form([
-                Forms\Components\Select::make('user_id')
-                    ->label('Alumno')
-                    ->options(User::where('es_admin', false)->pluck('name', 'id'))
-                    ->searchable()
-                    ->preload()
-                    ->required()
-                    ->reactive()
-                    ->afterStateUpdated(function (Set $set, ?string $state) {
-                        // Cuando se selecciona un alumno, autocompletamos el título
-                        if ($state) {
-                            $userName = User::find($state)?->name;
-                            $set('titulo', 'Reserva de ' . $userName);
-                        } else {
-                            $set('titulo', null);
-                        }
-                    }),
-                Forms\Components\TextInput::make('titulo')
-                    ->label('Título')
-                    ->required(),
+                Forms\Components\Grid::make(2)->schema([  // 👈 Agregar ->schema([
+                    Forms\Components\Select::make('user_id')
+                        ->label('Alumno')
+                        ->options(User::where('es_admin', false)->pluck('name', 'id'))
+                        ->searchable()
+                        ->preload()
+                        ->required()
+                        ->reactive()
+                        ->afterStateUpdated(function (Set $set, ?string $state) {
+                            if ($state) {
+                                $userName = User::find($state)?->name;
+                                $set('titulo', 'Reserva de ' . $userName);
+                            } else {
+                                $set('titulo', null);
+                            }
+                        }),
+
+                    Forms\Components\TextInput::make('titulo')
+                        ->label('Título')
+                        ->required(),
+                ]),
 
                 Forms\Components\Grid::make()
                     ->schema([
@@ -500,7 +497,6 @@ class ReservasCalendar extends Page implements HasActions
 
                 Forms\Components\Repeater::make('items')
                     ->label('Equipos')
-                    ->relationship()
                     ->schema([
                         Forms\Components\Select::make('equipo_id')
                             ->label('Equipo')
@@ -514,20 +510,19 @@ class ReservasCalendar extends Page implements HasActions
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
                                 $reservaId = $get('../../id'); // ID de la reserva actual
-                                        
+                    
                                 if (!$inicio || !$fin) {
-                                    if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
+                                    if ($state && $equipoActual = Equipo::find($state)) {
                                         return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
                                     }
                                     return [];
                                 }
-                                $query = \App\Models\Equipo::query()
+                                $query = Equipo::query()
                                     ->where(function ($query) use ($selectedIds, $state) {
                                         $query->whereNotIn('id', $selectedIds)
                                             ->orWhere('id', $state);
                                     });
 
-                                // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
                                 return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
                                     $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                     return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
@@ -550,11 +545,10 @@ class ReservasCalendar extends Page implements HasActions
                                         $reservaId = $get('../../id');
 
                                         if ($equipoId && $inicio && $fin) {
-                                            $equipo = \App\Models\Equipo::find($equipoId);
+                                            $equipo = Equipo::find($equipoId);
 
-                                            // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
                                             if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
-                                                $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                                $fail("No hay suficientes equipos disponibles");
                                             }
                                         }
                                     };
@@ -563,7 +557,7 @@ class ReservasCalendar extends Page implements HasActions
                     ])
                     ->minItems(1)
                     ->columns(5)
-                    ->createItemButtonLabel(label: 'Añadir equipo')
+                    ->addActionLabel(label: 'Añadir equipo')
                     ->columnSpanFull(),
             ])
             ->action(function (array $data) {
@@ -585,7 +579,7 @@ class ReservasCalendar extends Page implements HasActions
                         }
                     }
 
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Reserva creada exitosamente')
                         ->success()
                         ->send();
@@ -593,7 +587,7 @@ class ReservasCalendar extends Page implements HasActions
                     $this->dispatch('$refresh');
 
                 } catch (\Exception $e) {
-                    \Filament\Notifications\Notification::make()
+                    Notification::make()
                         ->title('Error al crear la reserva')
                         ->body($e->getMessage())
                         ->danger()

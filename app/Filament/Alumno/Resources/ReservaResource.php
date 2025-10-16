@@ -6,7 +6,6 @@ use App\Filament\Alumno\Resources\ReservaResource\Pages;
 use App\Models\Reserva;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Support\Enums\Alignment;
 use Filament\Resources\Resource;
 use Filament\Notifications\Notification;
 use Filament\Forms\Get;
@@ -26,7 +25,6 @@ class ReservaResource extends Resource
 
     public static function form(Form $form): Form
     {
-        // ... (el método form se mantiene sin cambios)
         return $form
             ->schema([
                 Forms\Components\Grid::make(1)
@@ -75,40 +73,35 @@ class ReservaResource extends Resource
                         Forms\Components\Repeater::make('items')
                             ->label('Equipos')
                             ->relationship()
+                            ->collapsible()
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
                                     ->label('Equipo')
+                                    ->live(onBlur: true)
                                     ->columnSpan(4)
                                     ->required()
                                     ->preload()
                                     ->searchable()
-                                    ->reactive()
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->options(function (Get $get, ?string $state): array {
-                                        $selectedIds = collect($get('../../items'))->pluck('equipo_id')->filter()->all();
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
-                                        $reservaId = $get('../../id'); // ID de la reserva actual
-                            
-                                        // 👇 AGREGAR ESTA LÍNEA para obtener el ID de la reserva actual
-                                        $reservaId = $get('../../id'); // ID de la reserva que se está editando
-                            
+                                        $reservaId = $get('../../id');
+
                                         if (!$inicio || !$fin) {
                                             if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
                                                 return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
                                             }
                                             return [];
                                         }
-                                        $query = \App\Models\Equipo::query()
-                                            ->where(function ($query) use ($selectedIds, $state) {
-                                                $query->whereNotIn('id', $selectedIds)
-                                                    ->orWhere('id', $state);
-                                            });
 
-                                        // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
-                                        return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                        return \App\Models\Equipo::query()
+                                            ->get()
+                                            ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
                                             $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                             return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                        })->toArray();
+                                        })
+                                            ->toArray();
                                     })
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
                                 Forms\Components\TextInput::make('cantidad')
@@ -129,9 +122,8 @@ class ReservaResource extends Resource
                                                 if ($equipoId && $inicio && $fin) {
                                                     $equipo = \App\Models\Equipo::find($equipoId);
 
-                                                    // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
                                                     if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
-                                                        $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                                        $fail("No hay suficientes equipos disponibles");
                                                     }
                                                 }
                                             };
@@ -140,12 +132,11 @@ class ReservaResource extends Resource
                             ])
                             ->minItems(1)
                             ->columns(5)
-                            ->createItemButtonLabel(label: 'Añadir equipo')
+                            ->addActionLabel(label: 'Añadir equipo')
                             ->columnSpanFull(),
                     ])
             ]);
     }
-
     public static function table(Table $table): Table
     {
         return $table

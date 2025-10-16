@@ -92,34 +92,31 @@ class ReservaResource extends Resource
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
                                     ->label('Equipo')
+                                    ->live(onBlur: true)
                                     ->columnSpan(4)
                                     ->required()
                                     ->preload()
                                     ->searchable()
-                                    ->reactive()
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->options(function (Get $get, ?string $state): array {
-                                        $selectedIds = collect($get('../../items'))->pluck('equipo_id')->filter()->all();
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
-                                        $reservaId = $get('../../id'); // ID de la reserva actual
-                            
+                                        $reservaId = $get('../../id');
+
                                         if (!$inicio || !$fin) {
                                             if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
                                                 return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
                                             }
                                             return [];
                                         }
-                                        $query = \App\Models\Equipo::query()
-                                            ->where(function ($query) use ($selectedIds, $state) {
-                                                $query->whereNotIn('id', $selectedIds)
-                                                    ->orWhere('id', $state);
-                                            });
 
-                                        // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
-                                        return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                        return \App\Models\Equipo::query()
+                                            ->get()
+                                            ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
                                             $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                             return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                        })->toArray();
+                                        })
+                                            ->toArray();
                                     })
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
                                 Forms\Components\TextInput::make('cantidad')
@@ -137,24 +134,23 @@ class ReservaResource extends Resource
                                                 $fin = $get('../../fin');
                                                 $reservaId = $get('../../id');
 
-                                                // 👇 AGREGAR ESTA LÍNEA
                                                 $reservaId = $get('../../id');
 
                                                 if ($equipoId && $inicio && $fin) {
                                                     $equipo = \App\Models\Equipo::find($equipoId);
 
-                                                    // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
                                                     if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
-                                                        $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
+                                                        $fail("No hay suficientes equipos disponibles");
                                                     }
                                                 }
                                             };
                                         },
                                     ]),
                             ])
+                            ->grid(2)
                             ->minItems(1)
                             ->columns(5)
-                            ->createItemButtonLabel(label: 'Añadir equipo')
+                            ->addActionLabel(label: 'Añadir equipo')
                             ->columnSpanFull(),
                     ])
             ]);
