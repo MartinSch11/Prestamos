@@ -29,16 +29,11 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-                'primary' => Color::Green,
-                'danger' => Color::Rose,
-                'info' => Color::Blue,
-                'success' => Color::Emerald,
-                'warning' => Color::Orange,
+                'primary' => Color::Orange,
             ])
             ->brandName('Sistema de Reservas')
             ->topNavigation()
             ->databaseNotifications()
-            ->databaseNotificationsPolling('10s')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([

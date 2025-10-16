@@ -126,8 +126,7 @@
                             ($continuaAntes ? 'clip-left' :
                                 ($continuaDespues ? 'clip-right' : 'clip-'));
 
-                        // Paleta
-
+                        // Color de las reservas
                         $bgColor = match ($evento['estado']) {
                             'pendiente' => '#FDE68A',    // Amarillo pastel
                             'aceptado' => '#A7F3D0',     // Verde menta pastel
@@ -152,57 +151,57 @@
                         @mouseenter="$el.style.zIndex = 50" @mouseleave="$el.style.zIndex = 1">
 
                         <div x-data="{
-                                                                                showTooltip: false,
-                                                                                tooltipX: 0,
-                                                                                tooltipY: 0,
-                                                                                arrowX: 0,
-                                                                                isBelow: false,
-                                                                                positionTooltip() {
-                                                                                this.$nextTick(() => {
-                                                                                this.$nextTick(() => {
-                                                                                const ev = this.$refs.event.getBoundingClientRect();
-                                                                                const tp = this.$refs.tooltip.getBoundingClientRect();
+                                                                                        showTooltip: false,
+                                                                                        tooltipX: 0,
+                                                                                        tooltipY: 0,
+                                                                                        arrowX: 0,
+                                                                                        isBelow: false,
+                                                                                        positionTooltip() {
+                                                                                        this.$nextTick(() => {
+                                                                                        this.$nextTick(() => {
+                                                                                        const ev = this.$refs.event.getBoundingClientRect();
+                                                                                        const tp = this.$refs.tooltip.getBoundingClientRect();
 
-                                                                                                        if (tp.width === 0 || tp.height === 0) {
-                                                                                                            requestAnimationFrame(() => {
-                                                                                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
+                                                                                                                if (tp.width === 0 || tp.height === 0) {
+                                                                                                                    requestAnimationFrame(() => {
+                                                                                                                        const tpRetry = this.$refs.tooltip.getBoundingClientRect();
 
-                                                                                                                // Si aún no tiene dimensiones, usar altura estimada
-                                                                                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
-                                                                                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
+                                                                                                                        // Si aún no tiene dimensiones, usar altura estimada
+                                                                                                                        const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
+                                                                                                                        const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
 
-                                                                                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                                                                                        this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                                                                                    });
+                                                                                                                    return;
+                                                                                                                }
+
+                                                                                                                this.calculatePosition(ev, tp);
                                                                                                             });
-                                                                                                            return;
+                                                                                                        });
+                                                                                                    },
+                                                                                                    calculatePosition(ev, tp) {
+                                                                                                        let top = ev.top - tp.height - 12;
+
+                                                                                                        let left = ev.left + (ev.width / 2) - (tp.width / 2);
+                                                                                                        const eventCenterX = ev.left + (ev.width / 2);
+
+                                                                                                        if (left < 10) {
+                                                                                                            left = 10;
+                                                                                                        }
+                                                                                                        if (left + tp.width > window.innerWidth - 10) {
+                                                                                                            left = window.innerWidth - tp.width - 10;
                                                                                                         }
 
-                                                                                                        this.calculatePosition(ev, tp);
-                                                                                                    });
-                                                                                                });
-                                                                                            },
-                                                                                            calculatePosition(ev, tp) {
-                                                                                                let top = ev.top - tp.height - 12;
+                                                                                                        let arrowX = eventCenterX - left;
+                                                                                                        arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
 
-                                                                                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
-                                                                                                const eventCenterX = ev.left + (ev.width / 2);
+                                                                                                        this.isBelow = false;
+                                                                                                        this.arrowX = arrowX;
+                                                                                                        this.tooltipX = left;
+                                                                                                        this.tooltipY = top;
 
-                                                                                                if (left < 10) {
-                                                                                                    left = 10;
-                                                                                                }
-                                                                                                if (left + tp.width > window.innerWidth - 10) {
-                                                                                                    left = window.innerWidth - tp.width - 10;
-                                                                                                }
-
-                                                                                                let arrowX = eventCenterX - left;
-                                                                                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
-
-                                                                                                this.isBelow = false;
-                                                                                                this.arrowX = arrowX;
-                                                                                                this.tooltipX = left;
-                                                                                                this.tooltipY = top;
-
-                                                                                            }
-                                                                                        }"
+                                                                                                    }
+                                                                                                }"
                             @mouseenter="showTooltip = true; positionTooltip()" @mouseleave="showTooltip = false"
                             class="relative w-full h-full">
 
@@ -270,14 +269,18 @@
                             @php
                                 $badgeColor = match ($record->estado) {
                                     'pendiente' => 'warning',
+                                    'aceptado' => 'success',
+                                    'rechazado' => 'danger',
                                     'en_curso' => 'info',
-                                    'devuelto', 'completado' => 'success',
+                                    'devuelto', 'completado' => 'gray',
                                     'bloqueado' => 'danger',
                                     default => 'gray',
                                 };
 
                                 $badgeIcon = match ($record->estado) {
                                     'pendiente' => 'heroicon-o-clock',
+                                    'aceptado' => 'heroicon-o-check-circle',
+                                    'rechazado' => 'heroicon-o-x-circle',
                                     'en_curso' => 'heroicon-o-bolt',
                                     'devuelto', 'completado' => 'heroicon-o-check-circle',
                                     'bloqueado' => 'heroicon-o-lock-closed',
@@ -593,4 +596,25 @@
             }
         }
     </style>
+@endpush
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const reservaId = urlParams.get('reserva');
+
+            if (reservaId) {
+                console.log('[v0] Abriendo modal para reserva ID:', reservaId);
+
+                // Esperar a que Livewire esté listo
+                setTimeout(() => {
+                    @this.call('openReservaModal', parseInt(reservaId));
+
+                    // Limpiar el parámetro de la URL sin recargar la página
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, '', newUrl);
+                }, 100);
+            }
+        });
+    </script>
 @endpush

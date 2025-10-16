@@ -88,6 +88,7 @@ class ReservaResource extends Resource
 
                         Forms\Components\Repeater::make('items')
                             ->label('Equipos')
+                            ->relationship()
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
                                     ->label('Equipo')
@@ -96,61 +97,54 @@ class ReservaResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
-                                    ->options(function (Get $get, ?string $state): array { // Se añade $state
-                            
-                                        // Obtenemos los equipos ya seleccionados en OTRAS filas
-                                        $selectedIds = collect($get('../../items'))
-                                            ->pluck('equipo_id')
-                                            ->filter()
-                                            ->all();
-
-                                        // Obtenemos las fechas para verificar disponibilidad
+                                    ->options(function (Get $get, ?string $state): array {
+                                        $selectedIds = collect($get('../../items'))->pluck('equipo_id')->filter()->all();
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
-
-                                        // Si no hay fechas, no mostramos opciones
+                                        $reservaId = $get('../../id'); // ID de la reserva actual
+                            
                                         if (!$inicio || !$fin) {
-                                            // Si estamos editando, al menos mostramos el item actual
                                             if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
                                                 return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
                                             }
                                             return [];
                                         }
-
-                                        // Creamos la consulta base de equipos
                                         $query = \App\Models\Equipo::query()
-                                            // Filtramos los equipos ya seleccionados,
-                                            // PERO siempre incluimos el de la fila actual (`$state`)
                                             ->where(function ($query) use ($selectedIds, $state) {
-                                            $query->whereNotIn('id', $selectedIds)
-                                                ->orWhere('id', $state);
-                                        });
+                                                $query->whereNotIn('id', $selectedIds)
+                                                    ->orWhere('id', $state);
+                                            });
 
-                                        // Mapeamos los resultados para añadir la info de disponibilidad
-                                        return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin) {
-                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin);
+                                        // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
+                                        return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                             return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
                                         })->toArray();
                                     })
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
-
                                 Forms\Components\TextInput::make('cantidad')
                                     ->label('Cantidad')
                                     ->columnSpan(1)
                                     ->numeric()
                                     ->minValue(1)
                                     ->required()
-                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')) // 👈 Deshabilita el select
+                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin'))
                                     ->rules([
                                         function (Get $get) {
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
                                                 $equipoId = $get('equipo_id');
                                                 $inicio = $get('../../inicio');
                                                 $fin = $get('../../fin');
+                                                $reservaId = $get('../../id');
+
+                                                // 👇 AGREGAR ESTA LÍNEA
+                                                $reservaId = $get('../../id');
 
                                                 if ($equipoId && $inicio && $fin) {
                                                     $equipo = \App\Models\Equipo::find($equipoId);
-                                                    if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin)) {
+
+                                                    // 👇 MODIFICAR ESTA LÍNEA para pasar el ID de la reserva
+                                                    if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
                                                         $fail("No hay suficientes {$equipo->nombre} disponibles para esa fecha.");
                                                     }
                                                 }
@@ -159,9 +153,9 @@ class ReservaResource extends Resource
                                     ]),
                             ])
                             ->minItems(1)
-                            ->columns(5) // equipo + cantidad en una sola línea
+                            ->columns(5)
                             ->createItemButtonLabel(label: 'Añadir equipo')
-                            ->columnSpanFull(), // ocupa el ancho total
+                            ->columnSpanFull(),
                     ])
             ]);
     }
@@ -190,7 +184,7 @@ class ReservaResource extends Resource
                     'success' => 'aceptado',
                     'danger' => 'rechazado',
                     'info' => 'en_curso',
-                    'primary' => 'devuelto',
+                    'gray' => 'devuelto',
                 ])
                     ->formatStateUsing(fn(string $state): string => match ($state) {
                         'pendiente' => 'Pendiente',

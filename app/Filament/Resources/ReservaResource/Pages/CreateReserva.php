@@ -20,7 +20,7 @@ class CreateReserva extends CreateRecord
     protected function afterCreate(): void
     {
         $reserva = $this->getRecord();
-        $admins = User::where('es_admin', true)->get(); // Asumiendo que tienes una columna 'es_admin' en tu tabla de usuarios.
+        $admins = User::where('es_admin', true)->get();
 
         Notification::send($admins, new NuevaReservaNotification($reserva));
     }

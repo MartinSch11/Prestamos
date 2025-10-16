@@ -28,7 +28,7 @@ class AlumnoPanelProvider extends PanelProvider
             ->path('alumno')
             ->login(\Filament\Pages\Auth\Login::class)
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::Orange,
             ])
             ->discoverResources(in: app_path('Filament/Alumno/Resources'), for: 'App\\Filament\\Alumno\\Resources')
             ->discoverPages(in: app_path('Filament/Alumno/Pages'), for: 'App\\Filament\\Alumno\\Pages')
