@@ -5,9 +5,9 @@ namespace App\Filament\Pages;
 use App\Models\Equipo;
 use App\Models\Reserva;
 use App\Models\User;
-use App\Notifications\NuevaReservaNotification;
 use App\Notifications\ReservaEstadoNotification;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
@@ -15,7 +15,6 @@ use Filament\Pages\Page;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms;
-use Illuminate\Notifications\DatabaseNotification;
 use Filament\Forms\Get;
 
 class ReservasCalendar extends Page implements HasActions
@@ -31,11 +30,9 @@ class ReservasCalendar extends Page implements HasActions
 
     public function mount(): void
     {
-        // `request('reserva')` obtiene el valor del parámetro 'reserva' desde la URL
         $reservaId = request('reserva');
 
         if ($reservaId) {
-            // Si existe, llamamos a la función que ya tenías para abrir el modal
             $this->openReservaModal($reservaId);
         }
     }
@@ -48,7 +45,7 @@ class ReservasCalendar extends Page implements HasActions
     }
     public function getWeekStart(): Carbon
     {
-        return now()->startOfWeek(Carbon::MONDAY)->addWeeks($this->weekOffset)->startOfDay();
+        return now()->startOfWeek(CarbonInterface::MONDAY)->addWeeks($this->weekOffset)->startOfDay();
     }
 
     public function getWeekEnd(): Carbon
@@ -113,7 +110,6 @@ class ReservasCalendar extends Page implements HasActions
     }
 
     // Acciones de los Botones (Lógica nueva y refactorizada)
-
     public function aceptarReserva()
     {
         if ($this->record && $this->record->estado === 'pendiente') {
@@ -157,37 +153,12 @@ class ReservasCalendar extends Page implements HasActions
             if ($nuevoEstado === 'aceptado' || $nuevoEstado === 'rechazado') {
                 $this->record->user->notify(new ReservaEstadoNotification($this->record, $nuevoEstado));
             }
-            $this->actualizarNotificacionAsociada($this->record, $nuevoEstado);
 
             $this->closeReservaModal();
             $this->dispatch('refreshCalendar');
 
         } catch (\Exception $e) {
             Notification::make()->title('Error al actualizar la reserva')->body($e->getMessage())->danger()->send();
-        }
-    }
-
-    private function actualizarNotificacionAsociada(Reserva $reserva, string $estadoAccion): void
-    {
-        $reserva->loadMissing('user');
-
-        $notificaciones = DatabaseNotification::query()
-            ->where('type', NuevaReservaNotification::class)
-            ->where('data->reserva_id', $reserva->id)
-            ->get();
-
-        foreach ($notificaciones as $notificacion) {
-            $datos = $notificacion->data;
-
-            // Quitamos los botones de acción para que no aparezcan más
-            unset($datos['actions']);
-            $datos['body'] = "La reserva de {$reserva->user->name} fue {$estadoAccion}.";
-
-            // Actualizamos la notificación y la marcamos como leída
-            $notificacion->update([
-                'data' => $datos,
-                'read_at' => now()
-            ]);
         }
     }
 
@@ -346,9 +317,9 @@ class ReservasCalendar extends Page implements HasActions
                                 return Equipo::query()
                                     ->get()
                                     ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                    $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                    return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                })
+                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                        return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
+                                    })
                                     ->toArray();
                             })
                             ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
@@ -430,8 +401,7 @@ class ReservasCalendar extends Page implements HasActions
 
     protected function getHeaderActions(): array
     {
-        return [
-        ];
+        return [];
     }
 
     public function crearReservaAction(): Action
@@ -446,9 +416,10 @@ class ReservasCalendar extends Page implements HasActions
                 'class' => 'border-none font-medium bg-transparent hover:bg-gray-100 text-gray-700 shadow-none'
             ])
             ->modalHeading('Nueva Reserva')
+            ->modalSubmitActionLabel('Crear')
             ->modalWidth('4xl')
             ->form([
-                Forms\Components\Grid::make(2)->schema([  // 👈 Agregar ->schema([
+                Forms\Components\Grid::make(2)->schema([
                     Forms\Components\Select::make('user_id')
                         ->label('Alumno')
                         ->options(User::where('es_admin', false)->pluck('name', 'id'))

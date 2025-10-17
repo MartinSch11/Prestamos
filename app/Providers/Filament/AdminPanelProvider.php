@@ -18,6 +18,9 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Saade\FilamentFullCalendar\FilamentFullCalendarPlugin;
+use App\Filament\Resources\AdminResource\Widgets\ReservaStatsOverview;
+use App\Filament\Resources\AdminResource\Widgets\ReservasChart;
+
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -41,8 +44,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                ReservasChart::class,
+                ReservaStatsOverview::class,
             ])
             ->middleware([
                 EncryptCookies::class,
