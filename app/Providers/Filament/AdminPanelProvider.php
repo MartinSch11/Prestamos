@@ -21,7 +21,6 @@ use Saade\FilamentFullCalendar\FilamentFullCalendarPlugin;
 use App\Filament\Resources\AdminResource\Widgets\ReservaStatsOverview;
 use App\Filament\Resources\AdminResource\Widgets\ReservasChart;
 
-
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel

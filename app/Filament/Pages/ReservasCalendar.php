@@ -229,6 +229,7 @@ class ReservasCalendar extends Page implements HasActions
             ->label('Editar Reserva')
             ->modalHeading('Editar Reserva')
             ->modalWidth('4xl')
+            ->modalSubmitActionLabel('Editar')
             ->record(fn() => $this->record)
             ->fillForm(function () {
                 if (!$this->record) {
