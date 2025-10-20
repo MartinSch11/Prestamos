@@ -109,7 +109,7 @@ class ReservasCalendar extends Page implements HasActions
         $this->dispatch('close-modal', id: 'reserva-modal');
     }
 
-    // Acciones de los Botones (Lógica nueva y refactorizada)
+    // Acciones de los Botones
     public function aceptarReserva()
     {
         if ($this->record && $this->record->estado === 'pendiente') {
@@ -481,8 +481,8 @@ class ReservasCalendar extends Page implements HasActions
                                 $selectedIds = collect($get('../../items'))->pluck('equipo_id')->filter()->all();
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
-                                $reservaId = $get('../../id'); // ID de la reserva actual
-                    
+                                $reservaId = $get('../../id');
+
                                 if (!$inicio || !$fin) {
                                     if ($state && $equipoActual = Equipo::find($state)) {
                                         return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];

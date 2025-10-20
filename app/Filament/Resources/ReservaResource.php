@@ -36,7 +36,7 @@ class ReservaResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->reactive() // Hacemos que el formulario reaccione a los cambios
+                            ->reactive()
                             ->afterStateUpdated(function (Set $set, ?string $state) {
                                 // Cuando se selecciona un alumno, autocompletamos el título
                                 if ($state) {
@@ -50,8 +50,7 @@ class ReservaResource extends Resource
                             ->label('Título')
                             ->required(),
 
-                        // 📅 FECHAS en la misma fila
-                        Forms\Components\Grid::make(2)
+                            Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DateTimePicker::make('inicio')
                                     ->label('Fecha inicio')
@@ -233,7 +232,7 @@ class ReservaResource extends Resource
                     ->label('Acciones')
                     ->icon('heroicon-m-ellipsis-vertical'),
             ])
-            ->defaultSort('inicio', 'desc'); // 👉 Orden por defecto descendente
+            ->defaultSort('inicio', 'desc');
     }
 
     public static function getRelations(): array

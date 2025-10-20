@@ -23,6 +23,26 @@ class ReservaResource extends Resource
     protected static ?string $navigationLabel = 'Reservas';
     protected static ?string $pluralModelLabel = 'Reservas';
 
+    // Este método controla si el recurso es visible para el usuario actual.
+    public static function canViewAny(): bool
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return false;
+        }
+
+        // --- Aquí va tu lógica personalizada ---
+        // Ejemplo: Solo mostrar si el usuario pertenece a la carrera con ID = 1 (ej. "Diseño Gráfico")
+        // DEBES adaptar esta línea a la estructura de tu modelo User.
+        return $user->carrera_id === 1;
+
+        // --- Otros ejemplos de condiciones que podrías usar ---
+        // return $user->carrera->nombre === 'Diseño Gráfico'; // Si tienes una relación 'carrera'
+        // return in_array($user->carrera_id, [1, 3, 5]); // Si son varias carreras
+        // return str_ends_with($user->email, '@dominio-permitido.com'); // Por dominio de email
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -98,9 +118,9 @@ class ReservaResource extends Resource
                                         return \App\Models\Equipo::query()
                                             ->get()
                                             ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                            return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                        })
+                                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                                return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
+                                            })
                                             ->toArray();
                                     })
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),

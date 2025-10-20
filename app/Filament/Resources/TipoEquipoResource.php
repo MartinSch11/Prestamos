@@ -45,11 +45,8 @@ class TipoEquipoResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                // No hace falta por ahora
             ])
-            // 👇 Esto evita que redireccione a Edit
             ->recordUrl(null)
-            // 👇 Esto hace que el click en la fila abra el modal de "Ver"
             ->recordAction('view')
             ->actions([
                 Tables\Actions\ActionGroup::make([
