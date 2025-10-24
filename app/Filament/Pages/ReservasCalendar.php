@@ -431,7 +431,7 @@ class ReservasCalendar extends Page implements HasActions
                         ->afterStateUpdated(function (Set $set, ?string $state) {
                             if ($state) {
                                 $userName = User::find($state)?->name;
-                                $set('titulo', 'Reserva de ' . $userName);
+                                $set('titulo', 'Reserva ' . $userName);
                             } else {
                                 $set('titulo', null);
                             }
@@ -469,45 +469,56 @@ class ReservasCalendar extends Page implements HasActions
 
                 Forms\Components\Repeater::make('items')
                     ->label('Equipos')
+                    ->collapsible()
                     ->schema([
                         Forms\Components\Select::make('equipo_id')
                             ->label('Equipo')
+                            ->live(onBlur: true)
                             ->columnSpan(4)
                             ->required()
                             ->preload()
                             ->searchable()
-                            ->reactive()
+                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                             ->options(function (Get $get, ?string $state): array {
-                                $selectedIds = collect($get('../../items'))->pluck('equipo_id')->filter()->all();
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
                                 $reservaId = $get('../../id');
 
-                                if (!$inicio || !$fin) {
+                                // Si las fechas no son válidas (o no existen), no mostrar opciones
+                                if (!$inicio || !$fin || $fin <= $inicio) {
                                     if ($state && $equipoActual = Equipo::find($state)) {
-                                        return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
+                                        return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
                                     }
                                     return [];
                                 }
-                                $query = Equipo::query()
-                                    ->where(function ($query) use ($selectedIds, $state) {
-                                        $query->whereNotIn('id', $selectedIds)
-                                            ->orWhere('id', $state);
-                                    });
 
-                                return $query->get()->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                    $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                    return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                })->toArray();
+                                return Equipo::query()
+                                    ->get()
+                                    ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                        return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
+                                    })
+                                    ->filter()
+                                    ->toArray();
                             })
-                            ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
+                            ->disabled(function (Get $get): bool {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
+                                return !$inicio || !$fin || $fin <= $inicio;
+                            }),
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->columnSpan(1)
                             ->numeric()
                             ->minValue(1)
                             ->required()
-                            ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin'))
+                            ->disabled(function (Get $get): bool {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
+                                return !$inicio || !$fin || $fin <= $inicio;
+                            })
                             ->rules([
                                 function (Get $get) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -516,9 +527,9 @@ class ReservasCalendar extends Page implements HasActions
                                         $fin = $get('../../fin');
                                         $reservaId = $get('../../id');
 
-                                        if ($equipoId && $inicio && $fin) {
+                                        // Solo validar si las fechas y equipo son válidos
+                                        if ($equipoId && $inicio && $fin && $fin > $inicio) {
                                             $equipo = Equipo::find($equipoId);
-
                                             if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
                                                 $fail("No hay suficientes equipos disponibles");
                                             }

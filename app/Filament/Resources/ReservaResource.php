@@ -50,7 +50,7 @@ class ReservaResource extends Resource
                             ->label('Título')
                             ->required(),
 
-                            Forms\Components\Grid::make(2)
+                        Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DateTimePicker::make('inicio')
                                     ->label('Fecha inicio')
@@ -112,9 +112,9 @@ class ReservaResource extends Resource
                                         return \App\Models\Equipo::query()
                                             ->get()
                                             ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                            $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                            return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                        })
+                                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                                return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
+                                            })
                                             ->toArray();
                                     })
                                     ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
@@ -205,13 +205,29 @@ class ReservaResource extends Resource
                         'devuelto' => 'Devuelto',
                     ]),
             ])
-            ->recordUrl(null)
             ->recordAction('view')
+            ->recordUrl(null)
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
+
+                    Tables\Actions\Action::make('aceptado')
+                        ->label('Aceptar')
+                        ->icon('heroicon-o-check')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->visible(fn(Reserva $record) => $record->estado === 'pendiente')
+                        ->action(fn(Reserva $record) => $record->update(['estado' => 'aceptado'])),
+
+                    Tables\Actions\Action::make('rechazado')
+                        ->label('Rechazar')
+                        ->icon('heroicon-o-x-mark')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->visible(fn(Reserva $record) => $record->estado === 'pendiente')
+                        ->action(fn(Reserva $record) => $record->update(['estado' => 'rechazado'])),
 
                     Tables\Actions\Action::make('en_curso')
                         ->label('Marcar en curso')

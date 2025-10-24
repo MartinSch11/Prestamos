@@ -15,6 +15,7 @@ use Filament\Infolists;
 use Illuminate\Support\HtmlString;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon; // <-- Importante: Asegúrate de importar Carbon
 
 class ReservaResource extends Resource
 {
@@ -23,25 +24,18 @@ class ReservaResource extends Resource
     protected static ?string $navigationLabel = 'Reservas';
     protected static ?string $pluralModelLabel = 'Reservas';
 
-    // Este método controla si el recurso es visible para el usuario actual.
-    public static function canViewAny(): bool
-    {
-        $user = Auth::user();
+    // public static function canViewAny(): bool
+    // {
+    //     $user = Auth::user();
+    //     if (!$user) {
+    //         return false;
+    //     }
+    //     // Ejemplo:
+    //     // Asegúrate que la propiedad `carrera_id` exista en tu modelo User o ajústala.
+    //     // return $user->carrera_id === 1; // Ajusta esta lógica
+    //     return true; // Temporalmente habilitado para todos para pruebas
+    // }
 
-        if (!$user) {
-            return false;
-        }
-
-        // --- Aquí va tu lógica personalizada ---
-        // Ejemplo: Solo mostrar si el usuario pertenece a la carrera con ID = 1 (ej. "Diseño Gráfico")
-        // DEBES adaptar esta línea a la estructura de tu modelo User.
-        return $user->carrera_id === 1;
-
-        // --- Otros ejemplos de condiciones que podrías usar ---
-        // return $user->carrera->nombre === 'Diseño Gráfico'; // Si tienes una relación 'carrera'
-        // return in_array($user->carrera_id, [1, 3, 5]); // Si son varias carreras
-        // return str_ends_with($user->email, '@dominio-permitido.com'); // Por dominio de email
-    }
 
     public static function form(Form $form): Form
     {
@@ -58,22 +52,46 @@ class ReservaResource extends Resource
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DateTimePicker::make('inicio')
-                                    ->label('Fecha inicio')
+                                    ->label('Fecha de inicio')
                                     ->minDate(today())
                                     ->prefix('Empieza')
+                                    ->default(now())
                                     ->seconds(false)
-                                    ->required(),
-                                Forms\Components\DateTimePicker::make('fin')
-                                    ->label('Fecha fin')
                                     ->required()
                                     ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        if (!$state) {
+                                            // Si inicio se borra, limpiamos fin y errores
+                                            $set('fin', null);
+                                            $set('error_fin', null); // Limpiar error si inicio cambia
+                                            return;
+                                        }
+                                        $fin = $get('fin');
+                                        // Establecer fin 1 hora después si fin está vacío o es anterior
+                                        if (empty($fin) || $fin <= $state) {
+                                            $newFin = Carbon::parse($state)->addHour();
+                                            $set('fin', $newFin);
+                                            // Como estamos estableciendo fin, asegurarnos de que no haya error
+                                            $set('error_fin', null);
+                                        } else {
+                                            // Si fin ya era válido, igual recalculamos helper text
+                                            $set('error_fin', null);
+                                        }
+                                    }),
+
+                                Forms\Components\DateTimePicker::make('fin')
+                                    ->label('Fecha de fin')
+                                    ->required()
+                                    ->reactive()
+                                    ->default(now()->addDay())
                                     ->prefix('Termina')
                                     ->seconds(false)
+                                    ->minDate(fn(Get $get): ?string => $get('inicio'))
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $inicio = $get('inicio');
-                                        if ($inicio && $state && $state < $inicio) {
-                                            $set('fin', null);
-                                            $set('error_fin', 'La fecha de fin no puede ser anterior a la fecha de inicio.');
+                                        // Validar que fin no sea anterior a inicio
+                                        if ($inicio && $state && $state <= $inicio) {
+                                            $set('error_fin', 'La fecha de fin debe ser posterior a la fecha de inicio.');
                                         } else {
                                             $set('error_fin', null);
                                         }
@@ -87,9 +105,15 @@ class ReservaResource extends Resource
                                                 '</span>'
                                             );
                                         }
+                                        $inicio = $get('inicio');
+                                        if ($inicio) {
+                                            // No mostrar helper si hay error
+                                            return new HtmlString('Debe ser posterior a: <span class="font-medium">' . Carbon::parse($inicio)->format('d/m/Y H:i') . '</span>');
+                                        }
                                         return null;
                                     }),
                             ]),
+
                         Forms\Components\Repeater::make('items')
                             ->label('Equipos')
                             ->relationship()
@@ -108,9 +132,10 @@ class ReservaResource extends Resource
                                         $fin = $get('../../fin');
                                         $reservaId = $get('../../id');
 
-                                        if (!$inicio || !$fin) {
+                                        // Si las fechas no son válidas (o no existen), no mostrar opciones
+                                        if (!$inicio || !$fin || $fin <= $inicio) {
                                             if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
-                                                return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
+                                                return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
                                             }
                                             return [];
                                         }
@@ -121,16 +146,27 @@ class ReservaResource extends Resource
                                                 $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                                 return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
                                             })
+                                            ->filter()
                                             ->toArray();
                                     })
-                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
+                                    ->disabled(function (Get $get): bool {
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+                                        // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
+                                        return !$inicio || !$fin || $fin <= $inicio;
+                                    }),
                                 Forms\Components\TextInput::make('cantidad')
                                     ->label('Cantidad')
                                     ->columnSpan(1)
                                     ->numeric()
                                     ->minValue(1)
                                     ->required()
-                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin'))
+                                    ->disabled(function (Get $get): bool {
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+                                        // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
+                                        return !$inicio || !$fin || $fin <= $inicio;
+                                    })
                                     ->rules([
                                         function (Get $get) {
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -139,9 +175,9 @@ class ReservaResource extends Resource
                                                 $fin = $get('../../fin');
                                                 $reservaId = $get('../../id');
 
-                                                if ($equipoId && $inicio && $fin) {
+                                                // Solo validar si las fechas y equipo son válidos
+                                                if ($equipoId && $inicio && $fin && $fin > $inicio) {
                                                     $equipo = \App\Models\Equipo::find($equipoId);
-
                                                     if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
                                                         $fail("No hay suficientes equipos disponibles");
                                                     }
@@ -157,6 +193,8 @@ class ReservaResource extends Resource
                     ])
             ]);
     }
+
+    // ... (El resto de tu Resource: table, getRelations, getPages, getEloquentQuery)
     public static function table(Table $table): Table
     {
         return $table
@@ -231,7 +269,6 @@ class ReservaResource extends Resource
                                 $record->delete();
                                 Notification::make()
                                     ->title('Reserva cancelada exitosamente')
-                                    ->body('Tu reserva ha sido cancelada.')
                                     ->success()
                                     ->send();
                             }),
@@ -254,7 +291,7 @@ class ReservaResource extends Resource
                             ->success()
                             ->send();
                     })
-                    ->visible(fn(Reserva $record) => $record->estado === 'pendiente'),
+                    ->visible(fn(Reserva $record): bool => $record->estado === 'pendiente'),
             ])
             ->defaultSort('inicio', direction: 'desc');
     }
@@ -279,3 +316,4 @@ class ReservaResource extends Resource
         return parent::getEloquentQuery()->where('user_id', Auth::id());
     }
 }
+

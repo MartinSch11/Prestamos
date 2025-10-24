@@ -30,23 +30,24 @@ class CreateReserva extends CreateRecord
     protected function afterCreate(): void
     {
         $reserva = $this->getRecord()->loadMissing('user');
-
         $admins = User::where('es_admin', true)->get();
 
         if ($admins->isEmpty()) {
-            Log::warning('[v5] No se encontraron administradores con es_admin = true');
+            Log::warning('No se encontraron administradores');
             return;
         }
 
         try {
             $calendarUrl = url('/admin/reservas-calendar?reserva=' . $reserva->id);
-            $notificationTitle = 'Nueva reserva pendiente';
-            $notificationBody = 'El alumno ' . $reserva->user->name . ' ha solicitado una nueva reserva.';
 
             foreach ($admins as $admin) {
+                // Envía notificación de Laravel (email + database)
+                $admin->notify(new \App\Notifications\NuevaReservaNotification($reserva, $calendarUrl));
+
+                // También envía notificación de Filament (para el panel)
                 Notification::make()
-                    ->title($notificationTitle)
-                    ->body($notificationBody)
+                    ->title('Nueva reserva pendiente')
+                    ->body('El alumno ' . $reserva->user->name . ' ha solicitado una nueva reserva.')
                     ->icon('heroicon-o-calendar')
                     ->iconColor('warning')
                     ->actions([
@@ -59,8 +60,7 @@ class CreateReserva extends CreateRecord
             }
 
         } catch (\Exception $e) {
-            Log::error('Error al enviar notificación Filament: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('Error al enviar notificaciones: ' . $e->getMessage());
         }
     }
 
