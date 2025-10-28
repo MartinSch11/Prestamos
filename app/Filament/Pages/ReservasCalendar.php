@@ -188,7 +188,7 @@ class ReservasCalendar extends Page implements HasActions
             ->color('danger')
             ->outlined()
             ->size('sm')
-            ->disabled(fn() => $this->record && in_array($this->record->estado, ['en_curso', 'devuelto', 'completado']))
+            ->disabled(fn() => $this->record && in_array($this->record->estado, ['en_curso', 'devuelto', 'completado', 'rechazado']))
             ->requiresConfirmation()
             ->modalHeading('Eliminar reserva')
             ->modalDescription('¿Estás seguro de que deseas eliminar esta reserva? Esta acción no se puede deshacer.')
@@ -264,6 +264,7 @@ class ReservasCalendar extends Page implements HasActions
                             $set('titulo', null);
                         }
                     }),
+
                 Forms\Components\TextInput::make('titulo')
                     ->label('Título')
                     ->required(),
@@ -324,6 +325,7 @@ class ReservasCalendar extends Page implements HasActions
                                     ->toArray();
                             })
                             ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
+                            
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->columnSpan(1)
@@ -507,6 +509,7 @@ class ReservasCalendar extends Page implements HasActions
                                 // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
                                 return !$inicio || !$fin || $fin <= $inicio;
                             }),
+
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->columnSpan(1)
