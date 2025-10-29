@@ -15,7 +15,7 @@ use Filament\Infolists;
 use Illuminate\Support\HtmlString;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon; // <-- Importante: Asegúrate de importar Carbon
+use Carbon\Carbon;
 
 class ReservaResource extends Resource
 {
@@ -194,7 +194,6 @@ class ReservaResource extends Resource
             ]);
     }
 
-    // ... (El resto de tu Resource: table, getRelations, getPages, getEloquentQuery)
     public static function table(Table $table): Table
     {
         return $table
