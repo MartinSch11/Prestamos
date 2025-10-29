@@ -4,8 +4,10 @@ namespace App\Filament\Alumno\Resources;
 
 use App\Filament\Alumno\Resources\ReservaResource\Pages;
 use App\Models\Reserva;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Notifications\Notification;
 use Filament\Forms\Get;
@@ -52,66 +54,28 @@ class ReservaResource extends Resource
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DateTimePicker::make('inicio')
-                                    ->label('Fecha de inicio')
+                                    ->label('Fecha y hora de Inicio')
                                     ->minDate(today())
                                     ->prefix('Empieza')
                                     ->default(now())
                                     ->seconds(false)
                                     ->required()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        if (!$state) {
-                                            // Si inicio se borra, limpiamos fin y errores
-                                            $set('fin', null);
-                                            $set('error_fin', null); // Limpiar error si inicio cambia
-                                            return;
-                                        }
-                                        $fin = $get('fin');
-                                        // Establecer fin 1 hora después si fin está vacío o es anterior
-                                        if (empty($fin) || $fin <= $state) {
-                                            $newFin = Carbon::parse($state)->addHour();
-                                            $set('fin', $newFin);
-                                            // Como estamos estableciendo fin, asegurarnos de que no haya error
-                                            $set('error_fin', null);
-                                        } else {
-                                            // Si fin ya era válido, igual recalculamos helper text
-                                            $set('error_fin', null);
-                                        }
-                                    }),
+                                    ->displayFormat('d/m/Y H:i')
+                                    ->live(),
 
                                 Forms\Components\DateTimePicker::make('fin')
-                                    ->label('Fecha de fin')
+                                    ->label('Fecha y hora de fin')
                                     ->required()
-                                    ->reactive()
+                                    ->minDate(today())
                                     ->default(now()->addDay())
                                     ->prefix('Termina')
                                     ->seconds(false)
-                                    ->minDate(fn(Get $get): ?string => $get('inicio'))
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $inicio = $get('inicio');
-                                        // Validar que fin no sea anterior a inicio
-                                        if ($inicio && $state && $state <= $inicio) {
-                                            $set('error_fin', 'La fecha de fin debe ser posterior a la fecha de inicio.');
-                                        } else {
-                                            $set('error_fin', null);
-                                        }
-                                    })
-                                    ->helperText(function (Get $get) {
-                                        $error = $get('error_fin');
-                                        if ($error) {
-                                            return new HtmlString(
-                                                '<span class="text-danger-600 dark:text-danger-500 font-medium">'
-                                                . e($error) .
-                                                '</span>'
-                                            );
-                                        }
-                                        $inicio = $get('inicio');
-                                        if ($inicio) {
-                                            // No mostrar helper si hay error
-                                            return new HtmlString('Debe ser posterior a: <span class="font-medium">' . Carbon::parse($inicio)->format('d/m/Y H:i') . '</span>');
-                                        }
-                                        return null;
-                                    }),
+                                    ->live()
+                                    ->displayFormat('d/m/Y H:i')
+                                    ->after('inicio')
+                                    ->validationMessages([
+                                        'after' => 'La fecha de fin debe ser posterior a la fecha de inicio.',
+                                    ]),
                             ]),
 
                         Forms\Components\Repeater::make('items')
@@ -123,16 +87,32 @@ class ReservaResource extends Resource
                                     ->label('Equipo')
                                     ->live(onBlur: true)
                                     ->columnSpan(4)
-                                    ->required()
+                                    ->required() // Requerido SI se añade un item
                                     ->preload()
                                     ->searchable()
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                    ->disableOptionWhen(function ($value, Get $get) {
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+                                        $reservaId = $get('../../id');
+
+                                        if (!$inicio || !$fin || $fin <= $inicio || !$value) {
+                                            return false;
+                                        }
+
+                                        $equipo = \App\Models\Equipo::find($value);
+                                        if (!$equipo) {
+                                            return false;
+                                        }
+
+                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                        return $disponibles === 0;
+                                    })
                                     ->options(function (Get $get, ?string $state): array {
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
                                         $reservaId = $get('../../id');
 
-                                        // Si las fechas no son válidas (o no existen), no mostrar opciones
                                         if (!$inicio || !$fin || $fin <= $inicio) {
                                             if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
                                                 return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
@@ -152,9 +132,11 @@ class ReservaResource extends Resource
                                     ->disabled(function (Get $get): bool {
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
-                                        // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
                                         return !$inicio || !$fin || $fin <= $inicio;
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Debes seleccionar un equipo.',
+                                    ]),
                                 Forms\Components\TextInput::make('cantidad')
                                     ->label('Cantidad')
                                     ->columnSpan(1)
@@ -164,18 +146,16 @@ class ReservaResource extends Resource
                                     ->disabled(function (Get $get): bool {
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
-                                        // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
                                         return !$inicio || !$fin || $fin <= $inicio;
                                     })
                                     ->rules([
                                         function (Get $get) {
-                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                            return function (string $attribute, $value, Closure $fail) use ($get) {
                                                 $equipoId = $get('equipo_id');
                                                 $inicio = $get('../../inicio');
                                                 $fin = $get('../../fin');
                                                 $reservaId = $get('../../id');
 
-                                                // Solo validar si las fechas y equipo son válidos
                                                 if ($equipoId && $inicio && $fin && $fin > $inicio) {
                                                     $equipo = \App\Models\Equipo::find($equipoId);
                                                     if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
@@ -184,10 +164,15 @@ class ReservaResource extends Resource
                                                 }
                                             };
                                         },
+                                    ])
+                                    ->validationMessages([
+                                        'required' => 'La cantidad es obligatoria.',
                                     ]),
                             ])
                             ->minItems(1)
-                            ->columns(5)
+                            ->validationMessages([
+                                'min' => 'Debes añadir al menos un equipo a la reserva.',
+                            ])->columns(5)
                             ->addActionLabel(label: 'Añadir equipo')
                             ->columnSpanFull(),
                     ])

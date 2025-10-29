@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\ReservaEstadoNotification;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
@@ -282,7 +283,7 @@ class ReservasCalendar extends Page implements HasActions
                             ->reactive()
                             ->rules([
                                 function (Forms\Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    return function (string $attribute, $value, Closure $fail) use ($get) {
                                         $inicio = $get('inicio');
                                         if ($inicio && $value && $value < $inicio) {
                                             $fail('La fecha de fin no puede ser anterior a la fecha de inicio.');
@@ -325,7 +326,7 @@ class ReservasCalendar extends Page implements HasActions
                                     ->toArray();
                             })
                             ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
-                            
+
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->columnSpan(1)
@@ -335,7 +336,7 @@ class ReservasCalendar extends Page implements HasActions
                             ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin'))
                             ->rules([
                                 function (Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    return function (string $attribute, $value, Closure $fail) use ($get) {
                                         $equipoId = $get('equipo_id');
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
@@ -447,25 +448,25 @@ class ReservasCalendar extends Page implements HasActions
                 Forms\Components\Grid::make()
                     ->schema([
                         Forms\Components\DateTimePicker::make('inicio')
-                            ->required()
-                            ->label('Fecha inicio')
+                            ->label('Fecha y hora de Inicio')
+                            ->prefix('Empieza')
                             ->default(now())
-                            ->reactive(),
+                            ->seconds(false)
+                            ->required()
+                            ->displayFormat('d/m/Y H:i')
+                            ->live(),
 
                         Forms\Components\DateTimePicker::make('fin')
+                            ->label('Fecha y hora de fin')
                             ->required()
-                            ->label('Fecha fin')
                             ->default(now()->addDay())
-                            ->reactive()
-                            ->rules([
-                                function (Forms\Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                        $inicio = $get('inicio');
-                                        if ($inicio && $value && $value < $inicio) {
-                                            $fail('La fecha de fin no puede ser anterior a la fecha de inicio.');
-                                        }
-                                    };
-                                },
+                            ->prefix('Termina')
+                            ->seconds(false)
+                            ->live()
+                            ->displayFormat('d/m/Y H:i')
+                            ->after('inicio')
+                            ->validationMessages([
+                                'after' => 'La fecha de fin debe ser posterior a la fecha de inicio.',
                             ]),
                     ]),
 
@@ -481,12 +482,28 @@ class ReservasCalendar extends Page implements HasActions
                             ->preload()
                             ->searchable()
                             ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                            ->disableOptionWhen(function ($value, Get $get) {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                $reservaId = $get('../../id');
+
+                                if (!$inicio || !$fin || $fin <= $inicio || !$value) {
+                                    return false;
+                                }
+
+                                $equipo = Equipo::find($value);
+                                if (!$equipo) {
+                                    return false;
+                                }
+
+                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                return $disponibles === 0;
+                            })
                             ->options(function (Get $get, ?string $state): array {
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
                                 $reservaId = $get('../../id');
 
-                                // Si las fechas no son válidas (o no existen), no mostrar opciones
                                 if (!$inicio || !$fin || $fin <= $inicio) {
                                     if ($state && $equipoActual = Equipo::find($state)) {
                                         return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
@@ -506,10 +523,11 @@ class ReservasCalendar extends Page implements HasActions
                             ->disabled(function (Get $get): bool {
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
-                                // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
                                 return !$inicio || !$fin || $fin <= $inicio;
-                            }),
-
+                            })
+                            ->validationMessages([
+                                'required' => 'Debes seleccionar un equipo.',
+                            ]),
                         Forms\Components\TextInput::make('cantidad')
                             ->label('Cantidad')
                             ->columnSpan(1)
@@ -519,18 +537,16 @@ class ReservasCalendar extends Page implements HasActions
                             ->disabled(function (Get $get): bool {
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
-                                // Deshabilitado si falta inicio, falta fin, O fin no es posterior a inicio
                                 return !$inicio || !$fin || $fin <= $inicio;
                             })
                             ->rules([
                                 function (Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    return function (string $attribute, $value, Closure $fail) use ($get) {
                                         $equipoId = $get('equipo_id');
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
                                         $reservaId = $get('../../id');
 
-                                        // Solo validar si las fechas y equipo son válidos
                                         if ($equipoId && $inicio && $fin && $fin > $inicio) {
                                             $equipo = Equipo::find($equipoId);
                                             if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
@@ -539,10 +555,15 @@ class ReservasCalendar extends Page implements HasActions
                                         }
                                     };
                                 },
+                            ])
+                            ->validationMessages([
+                                'required' => 'La cantidad es obligatoria.',
                             ]),
                     ])
                     ->minItems(1)
-                    ->columns(5)
+                    ->validationMessages([
+                        'min' => 'Debes añadir al menos un equipo a la reserva.',
+                    ])->columns(5)
                     ->addActionLabel(label: 'Añadir equipo')
                     ->columnSpanFull(),
             ])
