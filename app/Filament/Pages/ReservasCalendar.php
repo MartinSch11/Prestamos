@@ -127,14 +127,14 @@ class ReservasCalendar extends Page implements HasActions
     public function marcarEnCurso()
     {
         if ($this->record && $this->record->estado === 'aceptado') {
-            $this->actualizarEstado('en_curso', 'Reserva marcada como "en curso"');
+            $this->actualizarEstado('en_curso', 'Reserva puesta en curso');
         }
     }
 
     public function marcarDevuelto()
     {
         if ($this->record && $this->record->estado === 'en_curso') {
-            $this->actualizarEstado('devuelto', 'Reserva marcada como "devuelta"');
+            $this->actualizarEstado('devuelto', 'Reserva devuelta');
         }
     }
 

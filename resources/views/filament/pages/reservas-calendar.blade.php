@@ -380,12 +380,12 @@
 
                         @elseif ($record->estado === 'aceptado')
                             <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt" size="sm">
-                                Marcar en curso
+                                En curso
                             </x-filament::button>
 
                         @elseif ($record->estado === 'en_curso')
                             <x-filament::button wire:click="marcarDevuelto" color="primary" outlined icon="heroicon-o-check-circle" size="sm">
-                                Marcar como devuelto
+                                Devuelto
                             </x-filament::button>
                         @endif
 
