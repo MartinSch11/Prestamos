@@ -238,7 +238,7 @@ class ReservaResource extends Resource
                     ->label('Ver')
                     ->icon('heroicon-o-eye')
                     ->modal()
-                    ->modalHeading('Detalles de la Reserva')
+                    ->modalHeading('')
                     ->modalSubmitAction(false)
                     ->infolist([
                         Infolists\Components\View::make('filament.alumno.resources.reserva-resource.infolists.reserva-detalle')

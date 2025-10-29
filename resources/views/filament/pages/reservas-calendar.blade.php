@@ -371,30 +371,27 @@
                     <div class="flex items-center justify-end gap-3">
 
                         @if ($record->estado === 'pendiente')
-                            <x-filament::button wire:click="aceptarReserva" color="success" icon="heroicon-o-check" size="sm">
+                            <x-filament::button wire:click="aceptarReserva" color="success" outlined icon="heroicon-o-check" size="sm">
                                 Aceptar
                             </x-filament::button>
-                            <x-filament::button wire:click="rechazarReserva" color="danger" outlined icon="heroicon-o-x-mark"
-                                size="sm">
+                            <x-filament::button wire:click="rechazarReserva" color="danger" outlined icon="heroicon-o-x-mark" size="sm">
                                 Rechazar
                             </x-filament::button>
 
                         @elseif ($record->estado === 'aceptado')
-                            <x-filament::button wire:click="marcarEnCurso" color="info" icon="heroicon-o-bolt" size="sm">
+                            <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt" size="sm">
                                 Marcar en curso
                             </x-filament::button>
 
                         @elseif ($record->estado === 'en_curso')
-                            <x-filament::button wire:click="marcarDevuelto" color="primary" icon="heroicon-o-check-circle"
-                                size="sm">
+                            <x-filament::button wire:click="marcarDevuelto" color="primary" outlined icon="heroicon-o-check-circle" size="sm">
                                 Marcar como devuelto
                             </x-filament::button>
                         @endif
 
                         {{-- El botón de editar solo aparece si no está devuelta o rechazada --}}
                         @if (!in_array($record->estado, ['devuelto', 'rechazado']))
-                            <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil"
-                                size="sm">
+                            <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil" size="sm">
                                 Editar
                             </x-filament::button>
                         @endif
@@ -418,7 +415,7 @@
             grid-auto-rows: 36px;
             row-gap: 6px;
             min-height: 400px;
-            padding: 12px 0;
+            padding-bottom: 12px;
         }
 
         .calendar-day-divider {
