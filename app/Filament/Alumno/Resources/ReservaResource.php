@@ -88,9 +88,33 @@ class ReservaResource extends Resource
                                     ->live(onBlur: true)
                                     ->columnSpan(4)
                                     ->required()
-                                    ->preload()
                                     ->searchable()
+                                    ->preload()
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                    ->options(function (Get $get, ?string $state): array {
+                                        $inicio = $get('../../inicio');
+                                        $fin = $get('../../fin');
+                                        $reservaId = $get('../../id');
+
+                                        if (!$inicio || !$fin || $fin <= $inicio) {
+                                            if ($state && $equipoActual = \App\Models\Equipo::with('tipo')->find($state)) {
+                                                return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
+                                            }
+                                            return [];
+                                        }
+
+                                        return \App\Models\Equipo::query()
+                                            ->with('tipo')
+                                            ->get()
+                                            ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                                $tipoNombre = $equipo->tipo ? $equipo->tipo->nombre : '';
+
+                                                return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles}) · {$tipoNombre}"];
+                                            })
+                                            ->filter()
+                                            ->toArray();
+                                    })
                                     ->disableOptionWhen(function ($value, Get $get) {
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
@@ -107,27 +131,6 @@ class ReservaResource extends Resource
 
                                         $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
                                         return $disponibles === 0;
-                                    })
-                                    ->options(function (Get $get, ?string $state): array {
-                                        $inicio = $get('../../inicio');
-                                        $fin = $get('../../fin');
-                                        $reservaId = $get('../../id');
-
-                                        if (!$inicio || !$fin || $fin <= $inicio) {
-                                            if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
-                                                return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
-                                            }
-                                            return [];
-                                        }
-
-                                        return \App\Models\Equipo::query()
-                                            ->get()
-                                            ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                                return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                            })
-                                            ->filter()
-                                            ->toArray();
                                     })
                                     ->disabled(function (Get $get): bool {
                                         $inicio = $get('../../inicio');
