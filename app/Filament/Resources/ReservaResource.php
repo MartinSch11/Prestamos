@@ -3,8 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReservaResource\Pages;
+use App\Models\Equipo;
 use App\Models\Reserva;
 use App\Models\User;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Set;
@@ -38,120 +40,142 @@ class ReservaResource extends Resource
                             ->required()
                             ->reactive()
                             ->afterStateUpdated(function (Set $set, ?string $state) {
-                                // Cuando se selecciona un alumno, autocompletamos el título
                                 if ($state) {
                                     $userName = User::find($state)?->name;
-                                    $set('titulo', 'Reserva de ' . $userName);
+                                    $set('titulo', 'Reserva ' . $userName);
                                 } else {
                                     $set('titulo', null);
                                 }
                             }),
+
                         Forms\Components\TextInput::make('titulo')
                             ->label('Título')
                             ->required(),
+                    ]),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\DateTimePicker::make('inicio')
-                                    ->label('Fecha inicio')
-                                    ->required(),
+                Forms\Components\Grid::make()
+                    ->schema([
+                        Forms\Components\DateTimePicker::make('inicio')
+                            ->label('Fecha y hora de Inicio')
+                            ->prefix('Empieza')
+                            ->default(now())
+                            ->seconds(false)
+                            ->required()
+                            ->displayFormat('d/m/Y H:i')
+                            ->live(),
 
-                                Forms\Components\DateTimePicker::make('fin')
-                                    ->label('Fecha fin')
-                                    ->required()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $inicio = $get('inicio');
-
-                                        if ($inicio && $state && $state < $inicio) {
-                                            // Reset y mensaje inmediato
-                                            $set('fin', null);
-                                            $set('error_fin', 'La fecha de fin no puede ser anterior a la fecha de inicio.');
-                                        } else {
-                                            $set('error_fin', null);
-                                        }
-                                    })
-                                    ->helperText(function (Get $get) {
-                                        $error = $get('error_fin');
-
-                                        if ($error) {
-                                            // 🔴 Rojo en error (modo claro/oscuro)
-                                            return new HtmlString(
-                                                '<span class="text-danger-600 dark:text-danger-500 font-medium">'
-                                                . e($error) .
-                                                '</span>'
-                                            );
-                                        }
-                                    }),
+                        Forms\Components\DateTimePicker::make('fin')
+                            ->label('Fecha y hora de fin')
+                            ->required()
+                            ->default(now()->addDay())
+                            ->prefix('Termina')
+                            ->seconds(false)
+                            ->live()
+                            ->displayFormat('d/m/Y H:i')
+                            ->after('inicio')
+                            ->validationMessages([
+                                'after' => 'La fecha de fin debe ser posterior a la fecha de inicio.',
                             ]),
+                    ]),
 
-                        Forms\Components\Repeater::make('items')
-                            ->label('Equipos')
-                            ->relationship()
-                            ->schema([
-                                Forms\Components\Select::make('equipo_id')
-                                    ->label('Equipo')
-                                    ->live(onBlur: true)
-                                    ->columnSpan(4)
-                                    ->required()
-                                    ->preload()
-                                    ->searchable()
-                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                    ->options(function (Get $get, ?string $state): array {
+                Forms\Components\Repeater::make('items')
+                    ->label('Equipos')
+                    ->relationship()
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\Select::make('equipo_id')
+                            ->label('Equipo')
+                            ->live(onBlur: true)
+                            ->columnSpan(4)
+                            ->required()
+                            ->preload()
+                            ->searchable()
+                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                            ->disableOptionWhen(function ($value, Get $get) {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                $reservaId = $get('../../id');
+
+                                if (!$inicio || !$fin || $fin <= $inicio || !$value) {
+                                    return false;
+                                }
+
+                                $equipo = Equipo::find($value);
+                                if (!$equipo) {
+                                    return false;
+                                }
+
+                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                return $disponibles === 0;
+                            })
+                            ->options(function (Get $get, ?string $state): array {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                $reservaId = $get('../../id');
+
+                                if (!$inicio || !$fin || $fin <= $inicio) {
+                                    if ($state && $equipoActual = Equipo::find($state)) {
+                                        return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
+                                    }
+                                    return [];
+                                }
+
+                                return Equipo::query()
+                                    ->get()
+                                    ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                        return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
+                                    })
+                                    ->filter()
+                                    ->toArray();
+                            })
+                            ->disabled(function (Get $get): bool {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                return !$inicio || !$fin || $fin <= $inicio;
+                            })
+                            ->validationMessages([
+                                'required' => 'Debes seleccionar un equipo.',
+                            ]),
+                        Forms\Components\TextInput::make('cantidad')
+                            ->label('Cantidad')
+                            ->columnSpan(1)
+                            ->numeric()
+                            ->minValue(1)
+                            ->required()
+                            ->disabled(function (Get $get): bool {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                return !$inicio || !$fin || $fin <= $inicio;
+                            })
+                            ->rules([
+                                function (Get $get) {
+                                    return function (string $attribute, $value, Closure $fail) use ($get) {
+                                        $equipoId = $get('equipo_id');
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
                                         $reservaId = $get('../../id');
 
-                                        if (!$inicio || !$fin) {
-                                            if ($state && $equipoActual = \App\Models\Equipo::find($state)) {
-                                                return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no definidas)'];
+                                        if ($equipoId && $inicio && $fin && $fin > $inicio) {
+                                            $equipo = Equipo::find($equipoId);
+                                            if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
+                                                $fail("No hay suficientes equipos disponibles");
                                             }
-                                            return [];
                                         }
-
-                                        return \App\Models\Equipo::query()
-                                            ->get()
-                                            ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                                $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                                return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                            })
-                                            ->toArray();
-                                    })
-                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin')),
-                                Forms\Components\TextInput::make('cantidad')
-                                    ->label('Cantidad')
-                                    ->columnSpan(1)
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->required()
-                                    ->disabled(fn(Get $get): bool => !$get('../../inicio') || !$get('../../fin'))
-                                    ->rules([
-                                        function (Get $get) {
-                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                                $equipoId = $get('equipo_id');
-                                                $inicio = $get('../../inicio');
-                                                $fin = $get('../../fin');
-                                                $reservaId = $get('../../id');
-
-                                                $reservaId = $get('../../id');
-
-                                                if ($equipoId && $inicio && $fin) {
-                                                    $equipo = \App\Models\Equipo::find($equipoId);
-
-                                                    if ($equipo && $value > $equipo->disponibleEnRango($inicio, $fin, $reservaId)) {
-                                                        $fail("No hay suficientes equipos disponibles");
-                                                    }
-                                                }
-                                            };
-                                        },
-                                    ]),
+                                    };
+                                },
                             ])
-                            ->grid(2)
-                            ->minItems(1)
-                            ->columns(5)
-                            ->addActionLabel(label: 'Añadir equipo')
-                            ->columnSpanFull(),
+                            ->validationMessages([
+                                'required' => 'La cantidad es obligatoria.',
+                            ]),
                     ])
+                    ->minItems(1)
+                    ->validationMessages([
+                        'min' => 'Debes añadir al menos un equipo a la reserva.',
+                    ])
+                    ->columns(5)
+                    ->addActionLabel(label: 'Añadir equipo')
+                    ->columnSpanFull(),
             ]);
     }
 

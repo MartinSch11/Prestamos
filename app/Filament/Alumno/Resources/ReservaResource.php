@@ -87,7 +87,7 @@ class ReservaResource extends Resource
                                     ->label('Equipo')
                                     ->live(onBlur: true)
                                     ->columnSpan(4)
-                                    ->required() // Requerido SI se añade un item
+                                    ->required()
                                     ->preload()
                                     ->searchable()
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
