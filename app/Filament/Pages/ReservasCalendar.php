@@ -472,16 +472,38 @@ class ReservasCalendar extends Page implements HasActions
 
                 Forms\Components\Repeater::make('items')
                     ->label('Equipos')
-                    ->collapsible()
                     ->schema([
                         Forms\Components\Select::make('equipo_id')
                             ->label('Equipo')
                             ->live(onBlur: true)
                             ->columnSpan(4)
                             ->required()
-                            ->preload()
                             ->searchable()
-                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                            ->preload()
+                            ->options(function (Get $get, ?string $state): array {
+                                $inicio = $get('../../inicio');
+                                $fin = $get('../../fin');
+                                $reservaId = $get('../../id');
+
+                                if (!$inicio || !$fin || $fin <= $inicio) {
+                                    if ($state && $equipoActual = Equipo::with('tipo')->find($state)) {
+                                        return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
+                                    }
+                                    return [];
+                                }
+
+                                return Equipo::query()
+                                    ->with('tipo')
+                                    ->get()
+                                    ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
+                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
+                                        $tipoNombre = $equipo->tipo ? $equipo->tipo->nombre : '';
+
+                                        return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles}) · {$tipoNombre}"];
+                                    })
+                                    ->filter()
+                                    ->toArray();
+                            })
                             ->disableOptionWhen(function ($value, Get $get) {
                                 $inicio = $get('../../inicio');
                                 $fin = $get('../../fin');
@@ -496,29 +518,32 @@ class ReservasCalendar extends Page implements HasActions
                                     return false;
                                 }
 
+                                // Verificar disponibilidad
                                 $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                return $disponibles === 0;
-                            })
-                            ->options(function (Get $get, ?string $state): array {
-                                $inicio = $get('../../inicio');
-                                $fin = $get('../../fin');
-                                $reservaId = $get('../../id');
-
-                                if (!$inicio || !$fin || $fin <= $inicio) {
-                                    if ($state && $equipoActual = Equipo::find($state)) {
-                                        return [$equipoActual->id => $equipoActual->nombre . ' (Fechas no válidas)'];
-                                    }
-                                    return [];
+                                if ($disponibles === 0) {
+                                    return true;
                                 }
 
-                                return Equipo::query()
-                                    ->get()
-                                    ->mapWithKeys(function ($equipo) use ($inicio, $fin, $reservaId) {
-                                        $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                        return [$equipo->id => "{$equipo->nombre} (Disponibles: {$disponibles})"];
-                                    })
-                                    ->filter()
-                                    ->toArray();
+                                $items = $get('../../items');
+                                $currentIndex = $get('../');
+
+                                if (!is_array($items)) {
+                                    return false;
+                                }
+
+                                foreach ($items as $index => $item) {
+                                    // Saltar el item actual
+                                    if ($index === $currentIndex) {
+                                        continue;
+                                    }
+
+                                    // Si el equipo está seleccionado en otro item, deshabilitar
+                                    if (isset($item['equipo_id']) && $item['equipo_id'] == $value) {
+                                        return true;
+                                    }
+                                }
+
+                                return false;
                             })
                             ->disabled(function (Get $get): bool {
                                 $inicio = $get('../../inicio');

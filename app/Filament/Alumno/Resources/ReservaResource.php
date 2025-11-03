@@ -81,7 +81,6 @@ class ReservaResource extends Resource
                         Forms\Components\Repeater::make('items')
                             ->label('Equipos')
                             ->relationship()
-                            ->collapsible()
                             ->schema([
                                 Forms\Components\Select::make('equipo_id')
                                     ->label('Equipo')
@@ -90,7 +89,6 @@ class ReservaResource extends Resource
                                     ->required()
                                     ->searchable()
                                     ->preload()
-                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->options(function (Get $get, ?string $state): array {
                                         $inicio = $get('../../inicio');
                                         $fin = $get('../../fin');
@@ -129,8 +127,32 @@ class ReservaResource extends Resource
                                             return false;
                                         }
 
+                                        // Verificar disponibilidad
                                         $disponibles = $equipo->disponibleEnRango($inicio, $fin, $reservaId);
-                                        return $disponibles === 0;
+                                        if ($disponibles === 0) {
+                                            return true;
+                                        }
+
+                                        $items = $get('../../items');
+                                        $currentIndex = $get('../');
+
+                                        if (!is_array($items)) {
+                                            return false;
+                                        }
+
+                                        foreach ($items as $index => $item) {
+                                            // Saltar el item actual
+                                            if ($index === $currentIndex) {
+                                                continue;
+                                            }
+
+                                            // Si el equipo está seleccionado en otro item, deshabilitar
+                                            if (isset($item['equipo_id']) && $item['equipo_id'] == $value) {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
                                     })
                                     ->disabled(function (Get $get): bool {
                                         $inicio = $get('../../inicio');

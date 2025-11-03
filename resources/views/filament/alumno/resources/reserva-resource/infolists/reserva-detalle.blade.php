@@ -65,21 +65,34 @@
     </div>
 
     {{-- Lista de equipos reservados --}}
-    @if($record->items->count() > 0)
+    @if($record->items && $record->items->count() > 0)
         <div>
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-                <x-heroicon-o-archive-box class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 32 32"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M1.735 17.832l12.054 6.081 2.152-6.081-12.053-5.758-2.153 5.758zM16.211 17.832l2.045 6.027 12.484-6.081-2.422-5.704-12.107 5.758zM-0.247 7.212l4.144 4.843 12.053-6.134-3.928-5.005-12.269 6.296zM32.247 7.319l-12.001-6.403-4.09 5.005 12.162 6.134 3.929-4.736zM3.175 19.353l-0.041 5.839 12.713 5.893v-10.98l-1.816 4.736-10.856-5.488zM16.291 20.105v10.979l12.674-5.893v-5.799l-10.99 5.46-1.684-4.747z">
+                    </path>
+                </svg>
                 Equipos reservados
             </h3>
-            <div class="space-y-2 pt-2">
+
+            <div
+                class="space-y-1 p-1 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors mt-2">
                 @foreach($record->items as $item)
-                    <div
-                        class="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-between bg-white dark:bg-gray-900 ">
+                        <div class="flex items-center gap-1">
+                            <svg class="w-3 h-3 text-gray-500 dark:text-gray-400 flex-shrink-0"
+                                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9Z"
+                                    clip-rule="evenodd" />
+                            </svg>
                             <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {{ $item->equipo->nombre }}
                             </span>
                         </div>
+
                         <span
                             class="inline-flex items-center px-2.5 py-1 text-xs font-semibold text-gray-700 dark:text-white bg-gray-100 dark:bg-gray-800 rounded-full">
                             × {{ $item->cantidad }}

@@ -151,59 +151,57 @@
                         @mouseenter="$el.style.zIndex = 50" @mouseleave="$el.style.zIndex = 1">
 
                         <div x-data="{
-                            showTooltip: false,
-                            tooltipX: 0,
-                            tooltipY: 0,
-                            arrowX: 0,
-                            isBelow: false,
-                            positionTooltip() {
-                                this.$nextTick(() => {
-                                    this.$nextTick(() => {
-                                        const ev = this.$refs.event.getBoundingClientRect();
-                                        const tp = this.$refs.tooltip.getBoundingClientRect();
+                                        showTooltip: false,
+                                        tooltipX: 0,
+                                        tooltipY: 0,
+                                        arrowX: 0,
+                                        isBelow: false,
+                                        positionTooltip() {
+                                            this.$nextTick(() => {
+                                                this.$nextTick(() => {
+                                                    const ev = this.$refs.event.getBoundingClientRect();
+                                                    const tp = this.$refs.tooltip.getBoundingClientRect();
 
-                                        if (tp.width === 0 || tp.height === 0) {
-                                            requestAnimationFrame(() => {
-                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
+                                                    if (tp.width === 0 || tp.height === 0) {
+                                                        requestAnimationFrame(() => {
+                                                            const tpRetry = this.$refs.tooltip.getBoundingClientRect();
 
-                                                // Si aún no tiene dimensiones, usar altura estimada
-                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
-                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
+                                                            // Si aún no tiene dimensiones, usar altura estimada
+                                                            const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
+                                                            const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
 
-                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                            this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
+                                                        });
+                                                        return;
+                                                    }
+
+                                                    this.calculatePosition(ev, tp);
+                                                });
                                             });
-                                            return;
+                                        },
+                                        calculatePosition(ev, tp) {
+                                            let top = ev.top - tp.height - 12;
+
+                                            let left = ev.left + (ev.width / 2) - (tp.width / 2);
+                                            const eventCenterX = ev.left + (ev.width / 2);
+
+                                            if (left < 10) {
+                                                left = 10;
+                                            }
+                                            if (left + tp.width > window.innerWidth - 10) {
+                                                left = window.innerWidth - tp.width - 10;
+                                            }
+
+                                            let arrowX = eventCenterX - left;
+                                            arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
+
+                                            this.isBelow = false;
+                                            this.arrowX = arrowX;
+                                            this.tooltipX = left;
+                                            this.tooltipY = top;
                                         }
-
-                                        this.calculatePosition(ev, tp);
-                                    });
-                                });
-                            },
-                            calculatePosition(ev, tp) {
-                                let top = ev.top - tp.height - 12;
-
-                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
-                                const eventCenterX = ev.left + (ev.width / 2);
-
-                                if (left < 10) {
-                                    left = 10;
-                                }
-                                if (left + tp.width > window.innerWidth - 10) {
-                                    left = window.innerWidth - tp.width - 10;
-                                }
-
-                                let arrowX = eventCenterX - left;
-                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
-
-                                this.isBelow = false;
-                                this.arrowX = arrowX;
-                                this.tooltipX = left;
-                                this.tooltipY = top;
-                            }
-                        }"
-                        @mouseenter="showTooltip = true; positionTooltip()"
-                        @mouseleave="showTooltip = false"
-                        class="relative w-full h-full">
+                                    }" @mouseenter="showTooltip = true; positionTooltip()"
+                            @mouseleave="showTooltip = false" class="relative w-full h-full">
 
                             <div x-ref="event" @click="$wire.openReservaModal({{ $evento['id'] }})"
                                 class="timeline-event cursor-pointer {{ $clipClass }} {{ $evento['estado'] === 'devuelto' ? 'event-devuelto' : '' }}"
@@ -329,8 +327,8 @@
                 {{-- Lista de equipos reservados --}}
                 @if($record->items && $record->items->count() > 0)
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-1">
-                            <svg class="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 32 32"
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 32 32"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <path
                                     d="M1.735 17.832l12.054 6.081 2.152-6.081-12.053-5.758-2.153 5.758zM16.211 17.832l2.045 6.027 12.484-6.081-2.422-5.704-12.107 5.758zM-0.247 7.212l4.144 4.843 12.053-6.134-3.928-5.005-12.269 6.296zM32.247 7.319l-12.001-6.403-4.09 5.005 12.162 6.134 3.929-4.736zM3.175 19.353l-0.041 5.839 12.713 5.893v-10.98l-1.816 4.736-10.856-5.488zM16.291 20.105v10.979l12.674-5.893v-5.799l-10.99 5.46-1.684-4.747z">
@@ -338,20 +336,18 @@
                             </svg>
                             Equipos reservados
                         </h3>
-                        <div class="space-y-2 pt-2">
+                        <div
+                            class="space-y-1 p-1 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors mt-2">
                             @foreach($record->items as $item)
-                                <div
-                                    class="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+                                <div class="flex items-center justify-between bg-white dark:bg-gray-900 ">
                                     <div class="flex items-center gap-1">
-                                        <div
-                                            class="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                                            <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                                            </svg>
-                                        </div>
-                                        <span class="pl-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <svg class="w-3 h-3 text-gray-500 dark:text-gray-400 flex-shrink-0"
+                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9Z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                             {{ $item->equipo->nombre }}
                                         </span>
                                     </div>
@@ -371,27 +367,32 @@
                     <div class="flex items-center justify-end gap-3">
 
                         @if ($record->estado === 'pendiente')
-                            <x-filament::button wire:click="aceptarReserva" color="success" outlined icon="heroicon-o-check" size="sm">
+                            <x-filament::button wire:click="aceptarReserva" color="success" outlined icon="heroicon-o-check"
+                                size="sm">
                                 Aceptar
                             </x-filament::button>
-                            <x-filament::button wire:click="rechazarReserva" color="danger" outlined icon="heroicon-o-x-mark" size="sm">
+                            <x-filament::button wire:click="rechazarReserva" color="danger" outlined icon="heroicon-o-x-mark"
+                                size="sm">
                                 Rechazar
                             </x-filament::button>
 
                         @elseif ($record->estado === 'aceptado')
-                            <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt" size="sm">
+                            <x-filament::button wire:click="marcarEnCurso" color="info" outlined icon="heroicon-o-bolt"
+                                size="sm">
                                 En curso
                             </x-filament::button>
 
                         @elseif ($record->estado === 'en_curso')
-                            <x-filament::button wire:click="marcarDevuelto" color="primary" outlined icon="heroicon-o-check-circle" size="sm">
+                            <x-filament::button wire:click="marcarDevuelto" color="primary" outlined
+                                icon="heroicon-o-check-circle" size="sm">
                                 Devuelto
                             </x-filament::button>
                         @endif
 
                         {{-- El botón de editar solo aparece si no está devuelta o rechazada --}}
                         @if (!in_array($record->estado, ['devuelto', 'rechazado']))
-                            <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil" size="sm">
+                            <x-filament::button wire:click="editarReserva" color="warning" outlined icon="heroicon-o-pencil"
+                                size="sm">
                                 Editar
                             </x-filament::button>
                         @endif
