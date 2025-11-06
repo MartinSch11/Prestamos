@@ -151,56 +151,63 @@
                         @mouseenter="$el.style.zIndex = 50" @mouseleave="$el.style.zIndex = 1">
 
                         <div x-data="{
-                                        showTooltip: false,
-                                        tooltipX: 0,
-                                        tooltipY: 0,
-                                        arrowX: 0,
-                                        isBelow: false,
-                                        positionTooltip() {
-                                            this.$nextTick(() => {
-                                                this.$nextTick(() => {
-                                                    const ev = this.$refs.event.getBoundingClientRect();
-                                                    const tp = this.$refs.tooltip.getBoundingClientRect();
+                            showTooltip: false,
+                            tooltipX: 0,
+                            tooltipY: 0,
+                            arrowX: 0,
+                            isBelow: false,
+                            positionTooltip() {
+                                this.$nextTick(() => {
+                                    this.$nextTick(() => {
+                                        const ev = this.$refs.event.getBoundingClientRect();
+                                        const tp = this.$refs.tooltip.getBoundingClientRect();
 
-                                                    if (tp.width === 0 || tp.height === 0) {
-                                                        requestAnimationFrame(() => {
-                                                            const tpRetry = this.$refs.tooltip.getBoundingClientRect();
+                                        if (tp.width === 0 || tp.height === 0) {
+                                            requestAnimationFrame(() => {
+                                                const tpRetry = this.$refs.tooltip.getBoundingClientRect();
 
-                                                            // Si aún no tiene dimensiones, usar altura estimada
-                                                            const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
-                                                            const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
+                                                // Si aún no tiene dimensiones, usar altura estimada
+                                                const tooltipHeight = tpRetry.height > 0 ? tpRetry.height : 150;
+                                                const tooltipWidth = tpRetry.width > 0 ? tpRetry.width : 200;
 
-                                                            this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
-                                                        });
-                                                        return;
-                                                    }
-
-                                                    this.calculatePosition(ev, tp);
-                                                });
+                                                this.calculatePosition(ev, { width: tooltipWidth, height: tooltipHeight });
                                             });
-                                        },
-                                        calculatePosition(ev, tp) {
-                                            let top = ev.top - tp.height - 12;
-
-                                            let left = ev.left + (ev.width / 2) - (tp.width / 2);
-                                            const eventCenterX = ev.left + (ev.width / 2);
-
-                                            if (left < 10) {
-                                                left = 10;
-                                            }
-                                            if (left + tp.width > window.innerWidth - 10) {
-                                                left = window.innerWidth - tp.width - 10;
-                                            }
-
-                                            let arrowX = eventCenterX - left;
-                                            arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
-
-                                            this.isBelow = false;
-                                            this.arrowX = arrowX;
-                                            this.tooltipX = left;
-                                            this.tooltipY = top;
+                                            return;
                                         }
-                                    }" @mouseenter="showTooltip = true; positionTooltip()"
+
+                                        this.calculatePosition(ev, tp);
+                                    });
+                                });
+                            },
+                            calculatePosition(ev, tp) {
+                                let top = ev.top - tp.height - 12;
+                                let left = ev.left + (ev.width / 2) - (tp.width / 2);
+                                const eventCenterX = ev.left + (ev.width / 2);
+
+                                if (left < 10) {
+                                    left = 10;
+                                }
+                                if (left + tp.width > window.innerWidth - 10) {
+                                    left = window.innerWidth - tp.width - 10;
+                                }
+
+                                let arrowX = eventCenterX - left;
+                                arrowX = Math.max(20, Math.min(tp.width - 20, arrowX));
+
+                                if (top < 10) {
+                                    // No hay espacio arriba, abrir hacia abajo
+                                    top = ev.bottom + 12;
+                                    this.isBelow = true;
+                                } else {
+                                    // Hay espacio arriba, abrir hacia arriba
+                                    this.isBelow = false;
+                                }
+
+                                this.arrowX = arrowX;
+                                this.tooltipX = left;
+                                this.tooltipY = top;
+                            }
+                        }" @mouseenter="showTooltip = true; positionTooltip()"
                             @mouseleave="showTooltip = false" class="relative w-full h-full">
 
                             <div x-ref="event" @click="$wire.openReservaModal({{ $evento['id'] }})"
@@ -243,7 +250,8 @@
                                     @endif
                                 </div>
 
-                                <div class="tooltip-arrow tooltip-arrow-bottom" :style="`left: ${arrowX}px;`"></div>
+                                <div class="tooltip-arrow" :class="isBelow ? 'tooltip-arrow-top' : 'tooltip-arrow-bottom'"
+                                    :style="`left: ${arrowX}px;`"></div>
                             </div>
                         </div>
                     </div>
@@ -550,6 +558,16 @@
 
         .dark .tooltip-arrow-bottom {
             border-top-color: #34373F;
+        }
+
+        /* Flecha apuntando hacia arriba (tooltip está debajo del evento) */
+        .tooltip-arrow-top {
+            top: -6px;
+            border-bottom: 6px solid #ffffff;
+        }
+
+        .dark .tooltip-arrow-top {
+            border-bottom-color: #34373F;
         }
 
         /* Clips para los eventos que continúan */

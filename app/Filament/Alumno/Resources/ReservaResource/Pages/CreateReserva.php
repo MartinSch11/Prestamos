@@ -8,23 +8,24 @@ use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Filament\Notifications\Notification;
-use Filament\Notifications\Actions\Action;
 
-class CreateReserva extends CreateRecord
+class CreateReserva extends CreateRecord 
 {
-    protected static string $resource = ReservaResource::class;
 
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
-    }
+    protected static string $resource = ReservaResource::class;
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = Auth::id();
         $data['estado'] = 'pendiente';
+        unset($data['terms_accepted']);
 
         return $data;
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 
     protected function afterCreate(): void
@@ -41,17 +42,15 @@ class CreateReserva extends CreateRecord
             $calendarUrl = url('/admin/reservas-calendar?reserva=' . $reserva->id);
 
             foreach ($admins as $admin) {
-                // Envía notificación de Laravel (email + database)
                 $admin->notify(new \App\Notifications\NuevaReservaNotification($reserva, $calendarUrl));
 
-                // También envía notificación de Filament (para el panel)
                 Notification::make()
                     ->title('Nueva reserva pendiente')
                     ->body('El alumno ' . $reserva->user->name . ' ha solicitado una nueva reserva.')
                     ->icon('heroicon-o-calendar')
                     ->iconColor('warning')
                     ->actions([
-                        Action::make('ver')
+                        \Filament\Notifications\Actions\Action::make('ver')
                             ->label('Ver detalles')
                             ->url($calendarUrl)
                             ->link(),
@@ -69,7 +68,6 @@ class CreateReserva extends CreateRecord
         return '¡Solicitud enviada con éxito!';
     }
 
-    // Opcional: personalizar el mensaje completo
     protected function getCreatedNotification(): ?Notification
     {
         return Notification::make()

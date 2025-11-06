@@ -3,28 +3,28 @@
 namespace App\Filament\Alumno\Resources;
 
 use App\Filament\Alumno\Resources\ReservaResource\Pages;
+use App\Models\Equipo;
 use App\Models\Reserva;
 use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Set;
-use Filament\Resources\Resource;
 use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Infolists;
 use Filament\Forms\Get;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Infolists;
 use Illuminate\Support\HtmlString;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
 
 class ReservaResource extends Resource
 {
     protected static ?string $model = Reserva::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationLabel = 'Reservas';
-    protected static ?string $pluralModelLabel = 'Reservas';
+    protected static ?string $navigationLabel = 'Mis Reservas';
+    protected static ?string $pluralModelLabel = 'Mis Reservas';
 
     // public static function canViewAny(): bool
     // {
@@ -37,8 +37,6 @@ class ReservaResource extends Resource
     //     // return $user->carrera_id === 1; // Ajusta esta lógica
     //     return true; // Temporalmente habilitado para todos para pruebas
     // }
-
-
     public static function form(Form $form): Form
     {
         return $form
@@ -51,6 +49,7 @@ class ReservaResource extends Resource
                             ->readOnly()
                             ->required()
                             ->columnSpanFull(),
+
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DateTimePicker::make('inicio')
@@ -200,7 +199,27 @@ class ReservaResource extends Resource
                             ])->columns(5)
                             ->addActionLabel(label: 'Añadir equipo')
                             ->columnSpanFull(),
+                    ]),
+
+                Forms\Components\Checkbox::make('terms_accepted')
+                    ->label('Acepto los términos y condiciones')
+                    ->required()
+                    ->accepted()
+                    ->validationMessages([
+                        'accepted' => 'Debes aceptar los términos y condiciones para continuar.',
                     ])
+                    ->columnSpanFull()
+                    ->hintAction(
+                        Forms\Components\Actions\Action::make('viewTerms')
+                            ->label('Ver Términos')
+                            ->link()
+                            ->modalHeading('Términos y Condiciones')
+                            ->modalSubmitAction(false) // Esto oculta el botón de "submit"
+                            ->modalCancelActionLabel('Cerrar')
+                            ->modalWidth('2xl')
+                            ->modalContent(view('filament.alumno.resources.reserva-resource.terms-view'))
+                            ->modalFooterActionsAlignment('center')
+                    ),
             ]);
     }
 
@@ -249,6 +268,7 @@ class ReservaResource extends Resource
                     ->modal()
                     ->modalHeading('')
                     ->modalSubmitAction(false)
+                    ->modalFooterActionsAlignment('center')
                     ->infolist([
                         Infolists\Components\View::make('filament.alumno.resources.reserva-resource.infolists.reserva-detalle')
                             ->columnSpanFull(),
@@ -315,14 +335,12 @@ class ReservaResource extends Resource
         return [
             'index' => Pages\ListReservas::route('/'),
             'create' => Pages\CreateReserva::route('/create'),
-            'edit' => Pages\EditReserva::route('/{record}/edit'),
             'view' => Pages\ViewReserva::route('/{record}'),
         ];
     }
 
-    public static function getEloquentQuery(): Builder
+    public static function canEdit($record): bool
     {
-        return parent::getEloquentQuery()->where('user_id', Auth::id());
+        return false;
     }
 }
-
